@@ -1,6 +1,7 @@
 <?php
 // index.php (Halaman Login)
-require_once 'config/db.php';
+session_start();
+require_once 'config/db.php'; // Ganti dengan path file koneksi Anda yang benar
 
 // Jika sudah login, redirect ke dashboard masing-masing
 if (isset($_SESSION['user_id'])) {
@@ -17,41 +18,75 @@ if (isset($_SESSION['user_id'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Aplikasi Iuran RT 04</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Login - Aplikasi Iuran RT</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
-    <div class="container mt-5">
-        <div class="row justify-content-center">
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header text-center">
-                        <h4>Aplikasi Iuran RT 04</h4>
-                    </div>
-                    <div class="card-body">
-                        <h5 class="card-title text-center">Silakan Login</h5>
-                        
-                        <?php if (isset($_GET['error'])): ?>
-                            <div class="alert alert-danger"><?php echo htmlspecialchars($_GET['error']); ?></div>
-                        <?php endif; ?>
 
-                        <form action="login_process.php" method="POST">
-                            <div class="mb-3">
-                                <label for="username" class="form-label">Username</label>
-                                <input type="text" class="form-control" id="username" name="username" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="password" class="form-label">Password</label>
-                                <input type="password" class="form-control" id="password" name="password" required>
-                            </div>
-                            <div class="d-grid">
-                                <button type="submit" class="btn btn-primary">Login</button>
-                            </div>
-                        </form>
+    <div class="login-container">
+        <div class="form-panel">
+            <div class="form-content">
+                <h2>Login</h2>
+                
+                <?php if (isset($_GET['error'])): ?>
+                    <div class="alert alert-danger"><?php echo htmlspecialchars($_GET['error']); ?></div>
+                <?php endif; ?>
+
+                <form action="login_process.php" method="POST">
+                    <div class="input-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" placeholder="Masukkan username Anda" required>
                     </div>
+                    
+                    <div class="input-group">
+                        <label for="password">Password</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="password" name="password" placeholder="••••••••" required>
+                            <i class="fa-solid fa-eye-slash" id="togglePassword"></i>
+                        </div>
+                    </div>
+                    
+                    
+                    
+                    <button type="submit" class="btn-login">Login</button>
+                </form>
+
+                <div class="social-login">
+                    <p>Aplikasi Iuran Warga RT 04</p>
+                    <p style="font-size: 0.8em; color: #aaa;">Klapanunggal, Kab. Bogor</p>
                 </div>
             </div>
         </div>
+
+        <div class="overlay-panel">
+            <div class="overlay-content">
+                <h2>Selamat Datang!</h2>
+                <p>Sistem informasi untuk mempermudah pengelolaan data iuran warga RT 04.</p>
+            </div>
+        </div>
     </div>
+
+    <script>
+        const togglePassword = document.querySelector('#togglePassword');
+        const password = document.querySelector('#password');
+
+        togglePassword.addEventListener('click', function (e) {
+            const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+            password.setAttribute('type', type);
+            
+            if (this.classList.contains('fa-eye-slash')) {
+                this.classList.remove('fa-eye-slash');
+                this.classList.add('fa-eye');
+            } else {
+                this.classList.remove('fa-eye');
+                this.classList.add('fa-eye-slash');
+            }
+        });
+    </script>
+
 </body>
 </html>
