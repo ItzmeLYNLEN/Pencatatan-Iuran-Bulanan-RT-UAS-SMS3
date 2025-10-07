@@ -1,10 +1,18 @@
 <?php
 // admin/templates/header.php
+// Saya memindahkan session_start() ke sini agar ada di setiap halaman
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 require_once __DIR__ . '/../../config/db.php';
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
-    header("Location: ../index.php");
+    header("Location: ../index.php"); // Arahkan ke login utama, bukan admin
     exit;
 }
+
+// Ambil nama file saat ini untuk menandai menu aktif
+$current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -13,6 +21,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -23,10 +32,10 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item"><a class="nav-link" href="index.php">Dashboard</a></li>
-                    <li class="nav-item"><a class="nav-link" href="kelola_warga.php">Kelola Warga</a></li>
-                    <li class="nav-item"><a class="nav-link" href="catat_pembayaran.php">Catat Pembayaran</a></li>
-                    <li class="nav-item"><a class="nav-link" href="laporan.php">Laporan Iuran</a></li>
+                    <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'index.php') ? 'active' : ''; ?>" href="index.php">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'kelola_warga.php') ? 'active' : ''; ?>" href="kelola_warga.php">Kelola Warga</a></li>
+                    <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'catat_pembayaran.php') ? 'active' : ''; ?>" href="catat_pembayaran.php">Catat Pembayaran</a></li>
+                    <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'laporan.php') ? 'active' : ''; ?>" href="laporan.php">Laporan Iuran</a></li>
                 </ul>
                 <span class="navbar-text text-white me-3">
                     Halo, <?php echo htmlspecialchars($_SESSION['nama_lengkap']); ?>

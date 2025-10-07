@@ -1,6 +1,7 @@
-<?php
-// admin/templates/footer.php
-?>
-    </div> <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</div> <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>
