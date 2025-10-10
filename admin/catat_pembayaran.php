@@ -1,15 +1,19 @@
 <?php
+// PERBAIKAN 1: Mengatur zona waktu default ke Waktu Indonesia Barat (WIB)
+date_default_timezone_set('Asia/Jakarta');
+
 // admin/catat_pembayaran.php
 include 'templates/header.php';
 
-// PERBAIKAN DI SINI: Mengecek 'action'
+// Blok ini dieksekusi ketika admin menekan tombol "Bayar"
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'bayar_iuran') {
     $warga_id = $_POST['warga_id'];
     $bulan_iuran = $_POST['bulan_iuran'];
     $tahun_iuran = $_POST['tahun_iuran'];
     $jumlah = 50000; // Ganti dengan jumlah iuran default Anda
 
-    $tanggal_pembayaran = date('Y-m-d', strtotime("$tahun_iuran-$bulan_iuran-01"));
+    // PERBAIKAN 2: Simpan tanggal SAAT INI (ketika admin mencatat), bukan tanggal 1
+    $tanggal_pembayaran = date('Y-m-d');
 
     $stmt = $conn->prepare("INSERT INTO pembayaran (id_warga, bulan, tahun, jumlah, tanggal_bayar) VALUES (?, ?, ?, ?, ?)");
     $stmt->bind_param("iiids", $warga_id, $bulan_iuran, $tahun_iuran, $jumlah, $tanggal_pembayaran);
@@ -17,20 +21,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     if ($stmt->execute()) {
         $_SESSION['flash_message'] = ['type' => 'success', 'message' => 'Pembayaran berhasil dicatat!'];
     } else {
+        // Cek jika error karena duplikat entri (sudah bayar)
         $errorMessage = ($conn->errno == 1062) 
             ? 'Gagal: Warga ini sudah tercatat lunas untuk periode ini.'
             : 'Gagal mencatat pembayaran: ' . $stmt->error;
         $_SESSION['flash_message'] = ['type' => 'error', 'message' => $errorMessage];
     }
+    // Redirect kembali ke halaman dengan filter yang sama untuk refresh data
     header("Location: catat_pembayaran.php?bulan=$bulan_iuran&tahun=$tahun_iuran");
     exit();
 }
 
-// --- LOGIKA PENGAMBILAN DATA UNTUK DITAMPILKAN (Tidak berubah) ---
+// --- LOGIKA PENGAMBILAN DATA UNTUK DITAMPILKAN ---
+// Filter periode sekarang akan benar karena zona waktu sudah diatur
 $filter_bulan = isset($_GET['bulan']) ? $_GET['bulan'] : date('m');
 $filter_tahun = isset($_GET['tahun']) ? $_GET['tahun'] : date('Y');
 
+// Ambil semua data warga
 $result_warga = $conn->query("SELECT id_warga, nama_lengkap, no_rumah FROM warga WHERE role = 'warga' ORDER BY no_rumah ASC");
+
+// Ambil data siapa saja yang sudah bayar di periode yang difilter
 $stmt_paid = $conn->prepare("SELECT id_warga FROM pembayaran WHERE bulan = ? AND tahun = ?");
 $stmt_paid->bind_param("is", $filter_bulan, $filter_tahun);
 $stmt_paid->execute();
@@ -100,7 +110,7 @@ while ($row = $result_paid->fetch_assoc()) {
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 1. Script untuk konfirmasi pembayaran
+    // 1. Script untuk konfirmasi pembayaran via SweetAlert
     const payButtons = document.querySelectorAll('.btn-bayar');
     payButtons.forEach(button => {
         button.addEventListener('click', function(e) {
@@ -124,7 +134,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // 2. Script untuk menampilkan notifikasi (flash message)
+    // 2. Script untuk menampilkan notifikasi (flash message) dari PHP Session
     <?php if (isset($_SESSION['flash_message'])): ?>
         const flashMessage = <?php echo json_encode($_SESSION['flash_message']); ?>;
         Swal.fire({
