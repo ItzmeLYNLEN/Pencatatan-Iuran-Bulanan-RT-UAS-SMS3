@@ -40,3 +40,20 @@ $iuran_per_bulan = 50000;
     <?php endfor; ?>
 </div>
 <?php include 'templates/footer.php'; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    <?php if (isset($_SESSION['flash_message'])): ?>
+        const flashMessage = <?php echo json_encode($_SESSION['flash_message']); ?>;
+        
+        Swal.fire({
+            title: flashMessage.title,
+            text: flashMessage.message,
+            icon: flashMessage.type,
+            confirmButtonText: 'OK'
+        });
+
+        <?php unset($_SESSION['flash_message']); ?>
+    <?php endif; ?>
+});
+</script>
