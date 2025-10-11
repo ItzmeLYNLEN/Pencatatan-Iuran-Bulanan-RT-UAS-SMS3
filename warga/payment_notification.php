@@ -28,37 +28,21 @@ if ($status == 'success') {
     $result_cek = $cek_stmt->get_result();
 
     if ($result_cek->num_rows == 0) {
-        $tanggal_bayar = date('Y-m-d', strtotime("$tahun-$bulan-01"));
+        $tanggal_bayar = date('Y-m-d');
 
         $stmt_insert = $conn->prepare("INSERT INTO pembayaran (id_warga, bulan, tahun, jumlah, tanggal_bayar) VALUES (?, ?, ?, ?, ?)");
         $stmt_insert->bind_param("iiids", $id_warga, $bulan, $tahun, $jumlah, $tanggal_bayar);
         
         if ($stmt_insert->execute()) {
-            $_SESSION['flash_message'] = [
-                'type' => 'success',
-                'title' => 'Pembayaran Berhasil!',
-                'message' => 'Terima kasih, pembayaran Anda telah kami terima.'
-            ];
+            $_SESSION['flash_message'] = ['type' => 'success','title' => 'Pembayaran Berhasil!','message' => 'Terima kasih, pembayaran Anda telah kami terima.'];
         } else {
-            $_SESSION['flash_message'] = [
-                'type' => 'error',
-                'title' => 'Oops... Terjadi Kesalahan',
-                'message' => 'Gagal menyimpan data pembayaran ke database.'
-            ];
+            $_SESSION['flash_message'] = ['type' => 'error','title' => 'Oops... Terjadi Kesalahan','message' => 'Gagal menyimpan data pembayaran ke database.'];
         }
     } else {
-        $_SESSION['flash_message'] = [
-            'type' => 'info',
-            'title' => 'Informasi',
-            'message' => 'Anda sudah membayar iuran untuk periode ini.'
-        ];
+        $_SESSION['flash_message'] = ['type' => 'info','title' => 'Informasi','message' => 'Anda sudah membayar iuran untuk periode ini.'];
     }
 } else {
-    $_SESSION['flash_message'] = [
-        'type' => 'error',
-        'title' => 'Pembayaran Gagal',
-        'message' => 'Proses pembayaran Anda tidak berhasil diselesaikan.'
-    ];
+    $_SESSION['flash_message'] = ['type' => 'error','title' => 'Pembayaran Gagal','message' => 'Proses pembayaran Anda tidak berhasil diselesaikan.'];
 }
 
 header("Location: index.php");

@@ -1,18 +1,14 @@
 <?php
-// admin/index.php
 include 'templates/header.php';
 
-// --- LOGIKA PENGAMBILAN DATA UNTUK DASHBOARD ---
 $bulan_sekarang = date('m');
 $tahun_sekarang = date('Y');
 
-// Total Pembayaran
 $stmt_total = $conn->prepare("SELECT SUM(jumlah) AS total_bulanan FROM pembayaran WHERE tanggal_bayar IS NOT NULL AND bulan = ? AND tahun = ?");
 $stmt_total->bind_param("is", $bulan_sekarang, $tahun_sekarang);
 $stmt_total->execute();
 $total_pembayaran_bulan_ini = $stmt_total->get_result()->fetch_assoc()['total_bulanan'] ?? 0;
 
-// Statistik Warga
 $total_warga = $conn->query("SELECT COUNT(*) AS jumlah_warga FROM warga WHERE role = 'warga'")->fetch_assoc()['jumlah_warga'] ?? 0;
 $stmt_sudah_bayar = $conn->prepare("SELECT COUNT(*) AS sudah_bayar FROM pembayaran WHERE tanggal_bayar IS NOT NULL AND bulan = ? AND tahun = ?");
 $stmt_sudah_bayar->bind_param("is", $bulan_sekarang, $tahun_sekarang);
@@ -20,19 +16,29 @@ $stmt_sudah_bayar->execute();
 $warga_sudah_bayar = $stmt_sudah_bayar->get_result()->fetch_assoc()['sudah_bayar'] ?? 0;
 $warga_belum_bayar = $total_warga - $warga_sudah_bayar;
 
-// --- LOGIKA DATA UNTUK CHART (12 BULAN) ---
-$data_per_bulan = array_fill_keys(['January','February','March','April','May','June','July','August','September','October','November','December'], 0);
-$stmt_chart = $conn->prepare("SELECT MONTHNAME(tanggal_bayar) as bulan, SUM(jumlah) as total FROM pembayaran WHERE YEAR(tanggal_bayar) = ? AND tanggal_bayar IS NOT NULL GROUP BY MONTH(tanggal_bayar), MONTHNAME(tanggal_bayar)");
+$data_per_bulan = array_fill_keys(range(1, 12), 0);
+$stmt_chart = $conn->prepare("
+    SELECT bulan, SUM(jumlah) as total 
+    FROM pembayaran 
+    WHERE tahun = ? AND tanggal_bayar IS NOT NULL
+    GROUP BY bulan
+");
 $stmt_chart->bind_param("s", $tahun_sekarang);
 $stmt_chart->execute();
 $result_chart = $stmt_chart->get_result();
+
 while ($row = $result_chart->fetch_assoc()) {
-    if (array_key_exists($row['bulan'], $data_per_bulan)) {
-        $data_per_bulan[$row['bulan']] = (float) $row['total'];
-    }
+    $data_per_bulan[$row['bulan']] = (float) $row['total'];
 }
-$chart_labels_json = json_encode(array_keys($data_per_bulan));
-$chart_data_json = json_encode(array_values($data_per_bulan));
+
+$chart_labels = [];
+for ($i = 1; $i <= 12; $i++) {
+    $chart_labels[] = date('F', mktime(0, 0, 0, $i, 10));
+}
+
+$chart_data = array_values($data_per_bulan);
+$chart_labels_json = json_encode($chart_labels);
+$chart_data_json = json_encode($chart_data);
 ?>
 
 <h3 class="mb-4">Dashboard</h3>
