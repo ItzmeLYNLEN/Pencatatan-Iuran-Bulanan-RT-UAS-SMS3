@@ -1,5 +1,5 @@
 <?php
-date_default_timezone_set('Asia/Jakarta');
+
 include 'templates/header.php';
 
 if (!isset($_GET['bulan']) || !isset($_GET['tahun'])) {
@@ -12,122 +12,121 @@ $id_warga = $_SESSION['user_id'];
 $nama_lengkap = $_SESSION['nama_lengkap'];
 $iuran_per_bulan = 50000;
 $bulan_nama = date('F', mktime(0, 0, 0, $bulan, 10));
-$order_id = "INV-" . $tahun . str_pad($bulan, 2, '0', STR_PAD_LEFT) . "-" . $id_warga . "-" . time();
-
-
-$dummy_va_number = "78108" . mt_rand(100000000, 999999999); 
-$dummy_qris_image_url = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PEMBAYARAN-" . $order_id; 
+$order_id = "INV-" . $tahun . str_pad($bulan, 2, '0', STR_PAD_LEFT) . "-" . $id_warga;
+$dummy_va_number = "78108" . substr(str_shuffle("0123456789"), 0, 10);
+$dummy_qris_image_url = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PEMBAYARAN-" . $order_id;
+$expiration_time = time() + (15 * 60);
 ?>
+<style>
+    .payment-method-card { padding: 15px; border-radius: 10px; border: 2px solid #eee; cursor: pointer; transition: all 0.3s ease; }
+    .payment-method-card:hover { border-color: #0d6efd; }
+    .payment-method-card.active { border-color: #0d6efd; background-color: #e7f1ff; }
+    .payment-method-card input[type="radio"] { display: none; }
+</style>
 
 <div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header"><h4>Detail Tagihan Iuran</h4></div>
-            <div class="card-body">
-                <table class="table table-bordered">
-                    <tr><td>ID Pesanan</td><td><strong><?php echo $order_id; ?></strong></td></tr>
-                    <tr><td>Periode</td><td><strong><?php echo $bulan_nama . ' ' . $tahun; ?></strong></td></tr>
-                    <tr><td>Atas Nama</td><td><strong><?php echo htmlspecialchars($nama_lengkap); ?></strong></td></tr>
-                    <tr class="table-primary"><td><strong>Jumlah</strong></td><td><strong>Rp <?php echo number_format($iuran_per_bulan, 0, ',', '.'); ?></strong></td></tr>
-                </table>
-                <p class="text-center">Silakan lanjutkan ke halaman pembayaran yang aman untuk menyelesaikan transaksi Anda.</p>
-                <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#paymentModal">
-                        Lanjutkan ke Pembayaran
-                    </button>
-                    <a href="index.php" class="btn btn-secondary">Batal</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title" id="paymentModalLabel"><i class="fas fa-shield-alt"></i>Halaman Pembayaran</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0" style="border-radius: 1rem;">
+            <div class="card-body p-4">
                 <div class="row">
-                    <div class="col-md-5">
-                        <h6>Pilih Metode Pembayaran:</h6>
-                        <div class="list-group">
-                            <label class="list-group-item list-group-item-action">
-                                <input type="radio" name="payment_method" value="va" checked> 
-                                <i class="fas fa-university"></i> Virtual Account
-                            </label>
-                            <label class="list-group-item list-group-item-action">
-                                <input type="radio" name="payment_method" value="qris"> 
-                                <i class="fas fa-qrcode"></i> QRIS
-                            </label>
+                    <div class="col-lg-5 mb-4 mb-lg-0 border-end-lg">
+                        <h3 class="mb-4">Ringkasan Tagihan</h3>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between px-0"><span>ID Pesanan</span><strong><?php echo $order_id; ?></strong></li>
+                            <li class="list-group-item d-flex justify-content-between px-0"><span>Atas Nama</span><strong><?php echo htmlspecialchars($nama_lengkap); ?></strong></li>
+                            <li class="list-group-item d-flex justify-content-between px-0"><span>Periode</span><strong><?php echo $bulan_nama . ' ' . $tahun; ?></strong></li>
+                        </ul>
+                        <div class="bg-light p-3 rounded-3 text-center mt-3">
+                            <h6 class="text-muted mb-1">TOTAL PEMBAYARAN</h6>
+                            <h2 class="display-6 fw-bold text-primary">Rp <?php echo number_format($iuran_per_bulan, 0, ',', '.'); ?></h2>
                         </div>
-                        <hr>
-                        <h5>Total Bayar:</h5>
-                        <h3>Rp <?php echo number_format($iuran_per_bulan, 0, ',', '.'); ?></h3>
+                        <div class="d-grid gap-2 mt-4">
+                            <button id="btn-pilih-bayar" class="btn btn-primary btn-lg"><i class="fas fa-credit-card me-2"></i>Pilih Metode Pembayaran</button>
+                            <a href="index.php" class="btn btn-outline-secondary btn-sm">Batal</a>
+                        </div>
                     </div>
-
-                    <div class="col-md-7">
+                    
+                    <div class="col-lg-7" id="payment-options-panel" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="mb-0">Pilih Metode Pembayaran</h4>
+                            <div class="fw-bold text-danger"><i class="fas fa-clock"></i> <span id="countdown">15:00</span></div>
+                        </div>
+                        <div class="row g-3 mb-4">
+                            <div class="col-6">
+                                <label class="payment-method-card text-center active" id="label-va">
+                                    <input type="radio" name="payment_method" value="va" checked><i class="fas fa-university fa-2x mb-2 text-primary"></i><div>Virtual Account</div>
+                                </label>
+                            </div>
+                            <div class="col-6">
+                                <label class="payment-method-card text-center" id="label-qris">
+                                    <input type="radio" name="payment_method" value="qris"><i class="fas fa-qrcode fa-2x mb-2 text-primary"></i><div>QRIS</div>
+                                </label>
+                            </div>
+                        </div>
                         <div id="va-details" class="payment-details">
-                            <h5>Pembayaran via Virtual Account</h5>
-                            <p class="small text-muted">Selesaikan pembayaran Anda ke nomor Virtual Account di bawah ini.</p>
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <p class="mb-1"><strong>BANK MANDIRI</strong></p>
-                                    <h4 class="font-monospace"><?php echo $dummy_va_number; ?></h4>
-                                    <p class="mb-0">Tambah Keterangan Atas Nama: <?php echo htmlspecialchars($nama_lengkap); ?></p>
-                                </div>
+                            <h5 class="fw-normal"><i class="fas fa-file-invoice-dollar"></i> Pembayaran via Virtual Account</h5>
+                            <div class="card bg-light border-0 p-3 rounded-3 font-monospace text-center mt-3">
+                                <small>BANK MANDIRI</small>
+                                <h3 class="fw-bold mb-0 text-primary"><?php echo chunk_split($dummy_va_number, 4, ' '); ?></h3>
                             </div>
                         </div>
-
                         <div id="qris-details" class="payment-details" style="display: none;">
-                            <h5>Pembayaran via QRIS</h5>
-                            <p class="small text-muted">Scan QR Code di bawah ini menggunakan aplikasi e-wallet atau mobile banking Anda.</p>
-                            <div class="text-center">
-                                <img src="<?php echo $dummy_qris_image_url; ?>" alt="QRIS Code" class="img-fluid border rounded">
+                            <h5 class="fw-normal"><i class="fas fa-camera"></i> Pembayaran via QRIS</h5>
+                            <div class="text-center bg-white p-3 rounded-3 border mt-3">
+                                <img src="<?php echo $dummy_qris_image_url; ?>" alt="QRIS Code" class="img-fluid">
                             </div>
                         </div>
+                        <form method="POST" action="payment_notification.php" class="mt-4">
+                            <input type="hidden" name="id_warga" value="<?php echo $id_warga; ?>">
+                            <input type="hidden" name="bulan" value="<?php echo $bulan; ?>">
+                            <input type="hidden" name="tahun" value="<?php echo $tahun; ?>">
+                            <input type="hidden" name="jumlah" value="<?php echo $iuran_per_bulan; ?>">
+                            <input type="hidden" name="payment_status" value="success">
+                            <div class="d-grid"><button id="btn-selesaikan" type="submit" class="btn btn-success btn-lg fw-bold">Selesaikan Pembayaran</button></div>
+                        </form>
                     </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <form method="POST" action="payment_notification.php" class="w-100">
-                    <input type="hidden" name="order_id" value="<?php echo $order_id; ?>">
-                    <input type="hidden" name="id_warga" value="<?php echo $id_warga; ?>">
-                    <input type="hidden" name="bulan" value="<?php echo $bulan; ?>">
-                    <input type="hidden" name="tahun" value="<?php echo $tahun; ?>">
-                    <input type="hidden" name="jumlah" value="<?php echo $iuran_per_bulan; ?>">
-                    <input type="hidden" name="payment_status" value="success">
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-success btn-lg">Selesaikan Pembayaran</button>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const paymentRadios = document.querySelectorAll('input[name="payment_method"]');
-    const paymentDetails = document.querySelectorAll('.payment-details');
-
-    paymentRadios.forEach(radio => {
-        radio.addEventListener('change', function () {
-            
-            paymentDetails.forEach(detail => {
-                detail.style.display = 'none';
-            });
-
-            
-            const selectedDetail = document.getElementById(this.value + '-details');
-            if (selectedDetail) {
-                selectedDetail.style.display = 'block';
-            }
-        });
-    });
-});
-</script>
 
 <?php include 'templates/footer.php'; ?>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const btnPilihBayar=document.getElementById('btn-pilih-bayar');
+    const paymentOptionsPanel=document.getElementById('payment-options-panel');
+    const countdownEl=document.getElementById('countdown');
+    const btnSelesaikan=document.getElementById('btn-selesaikan');
+    const expirationTime=<?php echo $expiration_time; ?>*1000;
+    let timerInterval;
+    btnPilihBayar.addEventListener('click',function(){
+        paymentOptionsPanel.style.display='block';
+        this.style.display='none';
+        timerInterval=setInterval(updateCountdown,1000);
+        updateCountdown();
+    });
+    const paymentRadios=document.querySelectorAll('input[name="payment_method"]');
+    paymentRadios.forEach(radio=>{
+        radio.addEventListener('change',function(){
+            document.querySelectorAll('.payment-method-card').forEach(c=>c.classList.remove('active'));
+            document.getElementById('label-'+this.value).classList.add('active');
+            document.querySelectorAll('.payment-details').forEach(d=>d.style.display='none');
+            document.getElementById(this.value+'-details').style.display='block';
+        });
+    });
+    function updateCountdown(){
+        const now=new Date().getTime();
+        const distance=expirationTime-now;
+        if(distance<0){
+            clearInterval(timerInterval);
+            countdownEl.textContent="Waktu Habis";
+            btnSelesaikan.disabled=true;
+            return;
+        }
+        const minutes=Math.floor((distance%(1000*60*60))/(1000*60));
+        const seconds=Math.floor((distance%(1000*60))/1000);
+        countdownEl.textContent=`${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+    }
+});
+</script>

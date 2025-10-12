@@ -1,9 +1,8 @@
 <?php
-// index.php (Halaman Login)
 session_start();
-require_once 'config/db.php'; // Ganti dengan path file koneksi Anda yang benar
+require_once 'config/db.php'; 
 
-// Jika sudah login, redirect ke dashboard masing-masing
+
 if (isset($_SESSION['user_id'])) {
     if ($_SESSION['role'] == 'admin') {
         header("Location: admin/index.php");

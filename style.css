@@ -1,6 +1,4 @@
-/* File: style.css */
 
-/* Pengaturan Dasar & Font */
 * {
     box-sizing: border-box;
     margin: 0;
@@ -9,7 +7,7 @@
 
 body {
     font-family: 'Poppins', sans-serif;
-    background-color: #555; /* Latar belakang abu-abu gelap seperti di gambar */
+    background-color: #e9ecef; 
     display: flex;
     justify-content: center;
     align-items: center;
@@ -17,7 +15,7 @@ body {
     color: #333;
 }
 
-/* Kontainer Utama */
+
 .login-container {
     display: flex;
     width: 900px;
@@ -25,11 +23,11 @@ body {
     min-height: 550px;
     background-color: #fff;
     border-radius: 20px;
-    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
-    overflow: hidden; /* Penting agar panel kanan tidak keluar dari border-radius */
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
 }
 
-/* Panel Kiri (Form) */
+
 .form-panel {
     flex: 1;
     padding: 50px;
@@ -68,39 +66,14 @@ body {
     background-color: #f9f9f9;
 }
 
-.form-options {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    font-size: 0.9rem;
-}
-
-.remember-me {
-    display: flex;
-    align-items: center;
-}
-
-.remember-me input {
-    margin-right: 8px;
-}
-
-.forgot-password {
-    color: #6a5af9;
-    text-decoration: none;
-}
-
-.forgot-password:hover {
-    text-decoration: underline;
-}
 
 .btn-login {
     width: 100%;
+    color: white;
     padding: 15px;
     border: none;
     border-radius: 8px;
-    background: linear-gradient(90deg, #8A2BE2, #6a5af9);
-    color: white;
+    background: linear-gradient(90deg, #09203f, #537895); 
     font-size: 1.1rem;
     font-weight: 600;
     cursor: pointer;
@@ -121,7 +94,6 @@ body {
     color: #888;
 }
 
-/* Style untuk pesan error */
 .alert.alert-danger {
     background-color: #f8d7da;
     color: #721c24;
@@ -134,10 +106,9 @@ body {
 }
 
 
-/* Panel Kanan (Overlay) */
 .overlay-panel {
     flex: 1;
-    background: linear-gradient(90deg, #8A2BE2, #6a5af9);
+    background: linear-gradient(90deg, #09203f, #537895); 
     color: white;
     display: flex;
     justify-content: center;
@@ -157,7 +128,7 @@ body {
     line-height: 1.6;
 }
 
-/* Responsif untuk layar kecil (HP) */
+
 @media (max-width: 768px) {
     .login-container {
         flex-direction: column;
@@ -171,15 +142,12 @@ body {
     }
 }
 
-
-
 .password-wrapper {
     position: relative;
     width: 100%;
 }
 
 .password-wrapper input {
-
     width: 100%;
 }
 
