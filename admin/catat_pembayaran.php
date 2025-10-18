@@ -1,4 +1,6 @@
 <?php
+ob_start();
+
 include 'templates/header.php';
 
 
@@ -61,10 +63,10 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
              <div class="col-md-4"><label class="form-label">Bulan</label><select name="bulan" class="form-select">
                 <?php for ($i=1; $i<=12; $i++): ?><option value="<?php echo $i; ?>" <?php if ($i==$filter_bulan) echo 'selected'; ?>><?php echo date('F', mktime(0,0,0,$i,10)); ?></option><?php endfor; ?>
             </select></div>
-            <div class="col-md-3"><label class="form-label">Tahun</label><select name="tahun" class="form-select">
+             <div class="col-md-3"><label class="form-label">Tahun</label><select name="tahun" class="form-select">
                 <?php for ($i=date('Y'); $i>=date('Y')-5; $i--): ?><option value="<?php echo $i; ?>" <?php if ($i==$filter_tahun) echo 'selected'; ?>><?php echo $i; ?></option><?php endfor; ?>
             </select></div>
-            <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 mt-3 mt-md-0">Tampilkan</button></div>
+             <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 mt-3 mt-md-0">Tampilkan</button></div>
         </form>
     </div>
 </div>
@@ -222,3 +224,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<?php
+ob_end_flush();
+?>

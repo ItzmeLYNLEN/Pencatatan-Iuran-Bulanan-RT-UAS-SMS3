@@ -1,4 +1,6 @@
 <?php
+ob_start();
+
 include 'templates/header.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
@@ -102,11 +104,11 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
                 <form method="GET" action="" class="d-flex align-items-center">
                     <label class="form-label me-2 mb-0">Tampil</label>
                     <select name="limit" class="form-select form-select-sm" style="width: 80px;" onchange="this.form.submit()">
-                        <option value="5" <?php if($limit == 5) echo 'selected'; ?>>5</option>
-                        <option value="10" <?php if($limit == 10) echo 'selected'; ?>>10</option>
-                        <option value="25" <?php if($limit == 25) echo 'selected'; ?>>25</option>
-                        <option value="50" <?php if($limit == 50) echo 'selected'; ?>>50</option>
-                        <option value="-1" <?php if($limit == -1) echo 'selected'; ?>>Semua</option>
+                        <option value="5" <?php if ($limit == 5) echo 'selected'; ?>>5</option>
+                        <option value="10" <?php if ($limit == 10) echo 'selected'; ?>>10</option>
+                        <option value="25" <?php if ($limit == 25) echo 'selected'; ?>>25</option>
+                        <option value="50" <?php if ($limit == 50) echo 'selected'; ?>>50</option>
+                        <option value="-1" <?php if ($limit == -1) echo 'selected'; ?>>Semua</option>
                     </select>
                     <span class="ms-2">data</span>
                 </form>
@@ -125,24 +127,34 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-bordered table-hover">
-                <thead class="table-dark"><tr><th>No</th><th>Nama Lengkap</th><th>No. Rumah</th><th>Username</th><th>Aksi</th></tr></thead>
+                <thead class="table-dark">
+                    <tr>
+                        <th>No</th>
+                        <th>Nama Lengkap</th>
+                        <th>No. Rumah</th>
+                        <th>Username</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
                 <tbody>
-                    <?php if ($result->num_rows > 0): $no = $offset + 1; ?>
-                        <?php while($row = $result->fetch_assoc()): ?>
-                        <tr>
-                            <td><?php echo $no++; ?></td>
-                            <td><?php echo htmlspecialchars($row['nama_lengkap']); ?></td>
-                            <td><?php echo htmlspecialchars($row['no_rumah']); ?></td>
-                            <td><?php echo htmlspecialchars($row['username']); ?></td>
-                            <td>
-                                <button type="button" class="btn btn-sm btn-info lihatBtn" data-bs-toggle="modal" data-bs-target="#lihatWargaModal" data-nama="<?php echo htmlspecialchars($row['nama_lengkap']); ?>" data-rumah="<?php echo htmlspecialchars($row['no_rumah']); ?>" data-user="<?php echo htmlspecialchars($row['username']); ?>">Lihat</button>
-                                <button type="button" class="btn btn-sm btn-warning editBtn" data-bs-toggle="modal" data-bs-target="#editWargaModal" data-id="<?php echo $row['id_warga']; ?>" data-nama="<?php echo htmlspecialchars($row['nama_lengkap']); ?>" data-rumah="<?php echo htmlspecialchars($row['no_rumah']); ?>" data-user="<?php echo htmlspecialchars($row['username']); ?>">Edit</button>
-                                <button type="button" class="btn btn-sm btn-danger hapusBtn" data-bs-toggle="modal" data-bs-target="#hapusWargaModal" data-id="<?php echo $row['id_warga']; ?>">Hapus</button>
-                            </td>
-                        </tr>
+                    <?php if ($result->num_rows > 0) : $no = $offset + 1; ?>
+                        <?php while ($row = $result->fetch_assoc()) : ?>
+                            <tr>
+                                <td><?php echo $no++; ?></td>
+                                <td><?php echo htmlspecialchars($row['nama_lengkap']); ?></td>
+                                <td><?php echo htmlspecialchars($row['no_rumah']); ?></td>
+                                <td><?php echo htmlspecialchars($row['username']); ?></td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-info lihatBtn" data-bs-toggle="modal" data-bs-target="#lihatWargaModal" data-nama="<?php echo htmlspecialchars($row['nama_lengkap']); ?>" data-rumah="<?php echo htmlspecialchars($row['no_rumah']); ?>" data-user="<?php echo htmlspecialchars($row['username']); ?>">Lihat</button>
+                                    <button type="button" class="btn btn-sm btn-warning editBtn" data-bs-toggle="modal" data-bs-target="#editWargaModal" data-id="<?php echo $row['id_warga']; ?>" data-nama="<?php echo htmlspecialchars($row['nama_lengkap']); ?>" data-rumah="<?php echo htmlspecialchars($row['no_rumah']); ?>" data-user="<?php echo htmlspecialchars($row['username']); ?>">Edit</button>
+                                    <button type="button" class="btn btn-sm btn-danger hapusBtn" data-bs-toggle="modal" data-bs-target="#hapusWargaModal" data-id="<?php echo $row['id_warga']; ?>">Hapus</button>
+                                </td>
+                            </tr>
                         <?php endwhile; ?>
-                    <?php else: ?>
-                        <tr><td colspan="5" class="text-center">Data tidak ditemukan.</td></tr>
+                    <?php else : ?>
+                        <tr>
+                            <td colspan="5" class="text-center">Data tidak ditemukan.</td>
+                        </tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -154,115 +166,147 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
                 </p>
             </div>
             <div class="col-md-6">
-                <nav><ul class="pagination justify-content-end mb-0">
-                    <li class="page-item <?php echo ($page <= 1) ? 'disabled' : ''; ?>">
-                        <a class="page-link" href="?limit=<?php echo $limit; ?>&search=<?php echo $search; ?>&page=<?php echo $page - 1; ?>">Sebelumnya</a>
-                    </li>
-                    <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                    <li class="page-item <?php echo ($page == $i) ? 'active' : ''; ?>">
-                        <a class="page-link" href="?limit=<?php echo $limit; ?>&search=<?php echo $search; ?>&page=<?php echo $i; ?>"><?php echo $i; ?></a>
-                    </li>
-                    <?php endfor; ?>
-                    <li class="page-item <?php echo ($page >= $total_pages) ? 'disabled' : ''; ?>">
-                        <a class="page-link" href="?limit=<?php echo $limit; ?>&search=<?php echo $search; ?>&page=<?php echo $page + 1; ?>">Selanjutnya</a>
-                    </li>
-                </ul></nav>
+                <nav>
+                    <ul class="pagination justify-content-end mb-0">
+                        <li class="page-item <?php echo ($page <= 1) ? 'disabled' : ''; ?>">
+                            <a class="page-link" href="?limit=<?php echo $limit; ?>&search=<?php echo $search; ?>&page=<?php echo $page - 1; ?>">Sebelumnya</a>
+                        </li>
+                        <?php for ($i = 1; $i <= $total_pages; $i++) : ?>
+                            <li class="page-item <?php echo ($page == $i) ? 'active' : ''; ?>">
+                                <a class="page-link" href="?limit=<?php echo $limit; ?>&search=<?php echo $search; ?>&page=<?php echo $i; ?>"><?php echo $i; ?></a>
+                            </li>
+                        <?php endfor; ?>
+                        <li class="page-item <?php echo ($page >= $total_pages) ? 'disabled' : ''; ?>">
+                            <a class="page-link" href="?limit=<?php echo $limit; ?>&search=<?php echo $search; ?>&page=<?php echo $page + 1; ?>">Selanjutnya</a>
+                        </li>
+                    </ul>
+                </nav>
             </div>
         </div>
     </div>
 </div>
 
 <div class="modal fade" id="lihatWargaModal" tabindex="-1">
-    <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Detail Data Warga</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">Nama Lengkap</label><input type="text" class="form-control" id="lihat_nama_lengkap" readonly></div><div class="mb-3"><label class="form-label">No. Rumah</label><input type="text" class="form-control" id="lihat_no_rumah" readonly></div><div class="mb-3"><label class="form-label">Username</label><input type="text" class="form-control" id="lihat_username" readonly></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button></div></div></div>
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detail Data Warga</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">Nama Lengkap</label><input type="text" class="form-control" id="lihat_nama_lengkap" readonly></div>
+                <div class="mb-3"><label class="form-label">No. Rumah</label><input type="text" class="form-control" id="lihat_no_rumah" readonly></div>
+                <div class="mb-3"><label class="form-label">Username</label><input type="text" class="form-control" id="lihat_username" readonly></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button></div>
+        </div>
+    </div>
 </div>
 <div class="modal fade" id="editWargaModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">Edit Data Warga</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-      <form method="POST" action="">
-        <input type="hidden" name="action" value="edit_warga">
-        <div class="modal-body">
-            <input type="hidden" name="id_warga" id="edit_id_warga">
-            <div class="mb-3"><label class="form-label">Nama Lengkap</label><input type="text" class="form-control" name="nama_lengkap" id="edit_nama_lengkap" required></div>
-            <div class="mb-3"><label class="form-label">No. Rumah</label><input type="text" class="form-control" name="no_rumah" id="edit_no_rumah" required></div>
-            <div class="mb-3"><label class="form-label">Username</label><input type="text" class="form-control" name="username" id="edit_username" required></div>
-            <div class="mb-3">
-                <label class="form-label">Password Baru</label>
-                <div class="input-group">
-                    <input type="password" class="form-control" name="password" id="editPassword">
-                    <button class="btn btn-outline-secondary" type="button" id="toggleEditPassword"><i class="fas fa-eye"></i></button>
-                </div><small class="form-text text-muted">Kosongkan jika tidak ingin mengubah password.</small>
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Data Warga</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
+            <form method="POST" action="">
+                <input type="hidden" name="action" value="edit_warga">
+                <div class="modal-body">
+                    <input type="hidden" name="id_warga" id="edit_id_warga">
+                    <div class="mb-3"><label class="form-label">Nama Lengkap</label><input type="text" class="form-control" name="nama_lengkap" id="edit_nama_lengkap" required></div>
+                    <div class="mb-3"><label class="form-label">No. Rumah</label><input type="text" class="form-control" name="no_rumah" id="edit_no_rumah" required></div>
+                    <div class="mb-3"><label class="form-label">Username</label><input type="text" class="form-control" name="username" id="edit_username" required></div>
+                    <div class="mb-3">
+                        <label class="form-label">Password Baru</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" name="password" id="editPassword">
+                            <button class="btn btn-outline-secondary" type="button" id="toggleEditPassword"><i class="fas fa-eye"></i></button>
+                        </div><small class="form-text text-muted">Kosongkan jika tidak ingin mengubah password.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                </div>
+            </form>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-          <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
-        </div>
-      </form>
     </div>
-  </div>
 </div>
 <div class="modal fade" id="hapusWargaModal" tabindex="-1">
-    <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Konfirmasi Hapus</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form method="POST" action=""><input type="hidden" name="action" value="hapus_warga"><div class="modal-body"><p>Apakah Anda yakin ingin menghapus data warga ini?</p><input type="hidden" name="id_warga" id="hapus_id_warga"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-danger">Ya, Hapus</button></div></form></div></div>
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Konfirmasi Hapus</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action=""><input type="hidden" name="action" value="hapus_warga">
+                <div class="modal-body">
+                    <p>Apakah Anda yakin ingin menghapus data warga ini?</p><input type="hidden" name="id_warga" id="hapus_id_warga">
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-danger">Ya, Hapus</button></div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <?php include 'templates/footer.php'; ?>
 
 <script>
-function setupPasswordToggle(toggleButtonId, passwordInputId) {
-    const toggleButton = document.getElementById(toggleButtonId);
-    const passwordInput = document.getElementById(passwordInputId);
-    const icon = toggleButton.querySelector('i');
-    toggleButton.addEventListener('click', function () {
-        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-        passwordInput.setAttribute('type', type);
-        icon.classList.toggle('fa-eye');
-        icon.classList.toggle('fa-eye-slash');
+    function setupPasswordToggle(toggleButtonId, passwordInputId) {
+        const toggleButton = document.getElementById(toggleButtonId);
+        const passwordInput = document.getElementById(passwordInputId);
+        const icon = toggleButton.querySelector('i');
+        toggleButton.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            icon.classList.toggle('fa-eye');
+            icon.classList.toggle('fa-eye-slash');
+        });
+    }
+    setupPasswordToggle('toggleAddPassword', 'addPassword');
+    setupPasswordToggle('toggleEditPassword', 'editPassword');
+
+    const lihatWargaModal = document.getElementById('lihatWargaModal');
+    lihatWargaModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const nama = button.getAttribute('data-nama');
+        const rumah = button.getAttribute('data-rumah');
+        const user = button.getAttribute('data-user');
+        lihatWargaModal.querySelector('#lihat_nama_lengkap').value = nama;
+        lihatWargaModal.querySelector('#lihat_no_rumah').value = rumah;
+        lihatWargaModal.querySelector('#lihat_username').value = user;
     });
-}
-setupPasswordToggle('toggleAddPassword', 'addPassword');
-setupPasswordToggle('toggleEditPassword', 'editPassword');
 
-const lihatWargaModal = document.getElementById('lihatWargaModal');
-lihatWargaModal.addEventListener('show.bs.modal', function (event) {
-    const button = event.relatedTarget;
-    const nama = button.getAttribute('data-nama');
-    const rumah = button.getAttribute('data-rumah');
-    const user = button.getAttribute('data-user');
-    lihatWargaModal.querySelector('#lihat_nama_lengkap').value = nama;
-    lihatWargaModal.querySelector('#lihat_no_rumah').value = rumah;
-    lihatWargaModal.querySelector('#lihat_username').value = user;
-});
-
-const editWargaModal = document.getElementById('editWargaModal');
-editWargaModal.addEventListener('show.bs.modal', function (event) {
-    const button = event.relatedTarget;
-    const id = button.getAttribute('data-id');
-    const nama = button.getAttribute('data-nama');
-    const rumah = button.getAttribute('data-rumah');
-    const user = button.getAttribute('data-user');
-    editWargaModal.querySelector('#edit_id_warga').value = id;
-    editWargaModal.querySelector('#edit_nama_lengkap').value = nama;
-    editWargaModal.querySelector('#edit_no_rumah').value = rumah;
-    editWargaModal.querySelector('#edit_username').value = user;
-});
-
-const hapusWargaModal = document.getElementById('hapusWargaModal');
-hapusWargaModal.addEventListener('show.bs.modal', function (event) {
-    const button = event.relatedTarget;
-    const id = button.getAttribute('data-id');
-    hapusWargaModal.querySelector('#hapus_id_warga').value = id;
-});
-
-<?php if (isset($_SESSION['flash_message'])): ?>
-    const flashMessage = <?php echo json_encode($_SESSION['flash_message']); ?>;
-    Swal.fire({
-        title: (flashMessage.type === 'success' || flashMessage.type === 'info') ? 'Berhasil!' : 'Oops...',
-        text: flashMessage.message,
-        icon: flashMessage.type,
-        timer: 3000,
-        showConfirmButton: false
+    const editWargaModal = document.getElementById('editWargaModal');
+    editWargaModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const id = button.getAttribute('data-id');
+        const nama = button.getAttribute('data-nama');
+        const rumah = button.getAttribute('data-rumah');
+        const user = button.getAttribute('data-user');
+        editWargaModal.querySelector('#edit_id_warga').value = id;
+        editWargaModal.querySelector('#edit_nama_lengkap').value = nama;
+        editWargaModal.querySelector('#edit_no_rumah').value = rumah;
+        editWargaModal.querySelector('#edit_username').value = user;
     });
-    <?php unset($_SESSION['flash_message']); ?>
-<?php endif; ?>
+
+    const hapusWargaModal = document.getElementById('hapusWargaModal');
+    hapusWargaModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const id = button.getAttribute('data-id');
+        hapusWargaModal.querySelector('#hapus_id_warga').value = id;
+    });
+
+    <?php if (isset($_SESSION['flash_message'])) : ?>
+        const flashMessage = <?php echo json_encode($_SESSION['flash_message']); ?>;
+        Swal.fire({
+            title: (flashMessage.type === 'success' || flashMessage.type === 'info') ? 'Berhasil!' : 'Oops...',
+            text: flashMessage.message,
+            icon: flashMessage.type,
+            timer: 3000,
+            showConfirmButton: false
+        });
+        <?php unset($_SESSION['flash_message']); ?>
+    <?php endif; ?>
 </script>
+
+<?php
+ob_end_flush();
+?>
