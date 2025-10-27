@@ -80,7 +80,6 @@ $expiration_time = time() + (15 * 60);
                             <input type="hidden" name="id_warga" value="<?php echo $id_warga; ?>">
                             <input type="hidden" name="bulan" value="<?php echo $bulan; ?>">
                             <input type="hidden" name="tahun" value="<?php echo $tahun; ?>">
-                            <input type="hidden" name="jumlah" value="<?php echo $iuran_per_bulan; ?>">
                             <input type="hidden" name="payment_status" value="success">
                             <div class="d-grid"><button id="btn-selesaikan" type="submit" class="btn btn-success btn-lg fw-bold">Selesaikan Pembayaran</button></div>
                         </form>

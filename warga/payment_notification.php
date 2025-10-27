@@ -10,10 +10,11 @@ if ($_SERVER['REQUEST_METHOD'] != 'POST' || !isset($_SESSION['user_id'])) {
     exit;
 }
 
+
 $id_warga = (int)$_POST['id_warga'];
 $bulan = (int)$_POST['bulan'];
 $tahun = (int)$_POST['tahun'];
-$jumlah = (int)$_POST['jumlah'];
+$jumlah = 50000;
 $status = $_POST['payment_status'];
 
 if ($id_warga != $_SESSION['user_id']) {

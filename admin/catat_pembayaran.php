@@ -173,7 +173,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const namaWarga = this.getAttribute('data-nama-warga');
             Swal.fire({
                 title: 'Konfirmasi Pembayaran',
-                html: `Anda yakin ingin mencatat pembayaran untuk <br><b>${namaWarga}</b>?`,
+                text: `Anda yakin ingin mencatat pembayaran untuk ${namaWarga}?`, 
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#3085d6',
