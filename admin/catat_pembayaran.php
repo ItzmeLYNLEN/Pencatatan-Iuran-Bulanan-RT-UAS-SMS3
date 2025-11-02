@@ -3,7 +3,6 @@ ob_start();
 
 include 'templates/header.php';
 
-
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'bayar_iuran') {
     $warga_id = $_POST['warga_id'];
     $bulan_iuran = $_POST['bulan_iuran'];
@@ -23,7 +22,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     exit();
 }
 
-
 $filter_bulan = isset($_GET['bulan']) ? $_GET['bulan'] : date('m');
 $filter_tahun = isset($_GET['tahun']) ? $_GET['tahun'] : date('Y');
 
@@ -35,20 +33,35 @@ $total_warga_result = $conn->query("SELECT COUNT(id_warga) as total FROM warga W
 $total_warga = $total_warga_result->fetch_assoc()['total'];
 $total_pages = ($limit == -1) ? 1 : ceil($total_warga / $limit);
 
-$sql_warga = "SELECT id_warga, nama_lengkap, no_rumah FROM warga WHERE role = 'warga' ORDER BY no_rumah ASC";
-if ($limit != -1) {
-    $sql_warga .= " LIMIT $limit OFFSET $offset";
-}
-$result_warga = $conn->query($sql_warga);
+$sql_join = "
+    SELECT 
+        w.id_warga, 
+        w.nama_lengkap, 
+        w.no_rumah,
+        p.id_pembayaran
+    FROM 
+        warga w
+    LEFT JOIN 
+        pembayaran p ON w.id_warga = p.id_warga 
+                     AND p.bulan = ?
+                     AND p.tahun = ?
+    WHERE 
+        w.role = 'warga'
+    ORDER BY 
+        w.no_rumah ASC
+";
 
-$stmt_paid = $conn->prepare("SELECT id_warga FROM pembayaran WHERE bulan = ? AND tahun = ?");
-$stmt_paid->bind_param("is", $filter_bulan, $filter_tahun);
-$stmt_paid->execute();
-$result_paid = $stmt_paid->get_result();
-$paid_warga_ids = [];
-while ($row = $result_paid->fetch_assoc()) {
-    $paid_warga_ids[] = $row['id_warga'];
+if ($limit != -1) {
+    $sql_join .= " LIMIT ? OFFSET ?";
+    $stmt_warga = $conn->prepare($sql_join);
+    $stmt_warga->bind_param("isii", $filter_bulan, $filter_tahun, $limit, $offset);
+} else {
+    $stmt_warga = $conn->prepare($sql_join);
+    $stmt_warga->bind_param("is", $filter_bulan, $filter_tahun);
 }
+
+$stmt_warga->execute();
+$result_warga = $stmt_warga->get_result();
 
 $start_entry = ($total_warga == 0) ? 0 : $offset + 1;
 $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga);
@@ -104,19 +117,22 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
                 <tbody id="paymentTableBody">
                     <?php if ($result_warga->num_rows > 0): $no = $offset + 1; ?>
                         <?php while($warga = $result_warga->fetch_assoc()): ?>
+                        <?php
+                            $is_lunas = ($warga['id_pembayaran'] !== null);
+                        ?>
                         <tr>
                             <td><?php echo $no++; ?></td>
                             <td><?php echo htmlspecialchars($warga['nama_lengkap']); ?></td>
                             <td><?php echo htmlspecialchars($warga['no_rumah']); ?></td>
                             <td>
-                                <?php if(in_array($warga['id_warga'], $paid_warga_ids)): ?>
+                                <?php if($is_lunas): ?>
                                     <span class="badge bg-success">Lunas</span>
                                 <?php else: ?>
                                     <span class="badge bg-danger">Belum Lunas</span>
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <?php if(!in_array($warga['id_warga'], $paid_warga_ids)): ?>
+                                <?php if(!$is_lunas): ?>
                                     <form method="POST" action="?bulan=<?php echo $filter_bulan; ?>&tahun=<?php echo $filter_tahun; ?>&limit=<?php echo $limit; ?>&page=<?php echo $page; ?>">
                                         <input type="hidden" name="warga_id" value="<?php echo $warga['id_warga']; ?>">
                                         <input type="hidden" name="bulan_iuran" value="<?php echo $filter_bulan; ?>">
@@ -134,6 +150,7 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
                 </tbody>
             </table>
         </div>
+        
         <div class="row mt-3 align-items-center">
             <div class="col-md-6">
                 <p class="text-muted mb-0">

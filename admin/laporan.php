@@ -10,18 +10,38 @@ $total_warga_result = $conn->query("SELECT COUNT(id_warga) as total FROM warga W
 $total_warga = $total_warga_result->fetch_assoc()['total'];
 $total_pages = ($limit == -1) ? 1 : ceil($total_warga / $limit);
 
-$sql_warga = "SELECT id_warga, nama_lengkap, no_rumah FROM warga WHERE role='warga' ORDER BY no_rumah ASC";
-if ($limit != -1) {
-    $sql_warga .= " LIMIT $limit OFFSET $offset";
-}
-$warga_result = $conn->query($sql_warga);
-$warga_list = [];
-while ($row = $warga_result->fetch_assoc()) $warga_list[] = $row;
+$sql_join = "
+    SELECT 
+        w.id_warga, 
+        w.nama_lengkap, 
+        w.no_rumah, 
+        GROUP_CONCAT(p.bulan ORDER BY p.bulan) AS bulan_lunas 
+    FROM 
+        warga w
+    LEFT JOIN 
+        pembayaran p ON w.id_warga = p.id_warga AND p.tahun = ?
+    WHERE 
+        w.role = 'warga'
+    GROUP BY 
+        w.id_warga, w.nama_lengkap, w.no_rumah
+    ORDER BY 
+        w.no_rumah ASC
+";
 
-$pembayaran_result = $conn->query("SELECT id_warga, bulan FROM pembayaran WHERE tahun = $tahun_laporan");
-$pembayaran_data = [];
-while ($row = $pembayaran_result->fetch_assoc()) {
-    $pembayaran_data[$row['id_warga']][$row['bulan']] = true;
+if ($limit != -1) {
+    $sql_join .= " LIMIT ? OFFSET ?";
+    $stmt_warga = $conn->prepare($sql_join);
+    $stmt_warga->bind_param("iii", $tahun_laporan, $limit, $offset);
+} else {
+    $stmt_warga = $conn->prepare($sql_join);
+    $stmt_warga->bind_param("i", $tahun_laporan);
+}
+
+$stmt_warga->execute();
+$warga_result = $stmt_warga->get_result();
+$warga_list = [];
+while ($row = $warga_result->fetch_assoc()) {
+    $warga_list[] = $row;
 }
 
 $bulan_nama = [1 => 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -71,10 +91,13 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
                         <tr><td colspan="13">Belum ada data warga.</td></tr>
                     <?php else: ?>
                         <?php foreach ($warga_list as $warga): ?>
+                        <?php
+                            $bulan_lunas_array = explode(',', $warga['bulan_lunas'] ?? '');
+                        ?>
                         <tr>
                             <td class="text-start fw-bold"><?php echo htmlspecialchars($warga['nama_lengkap']) . ' (' . htmlspecialchars($warga['no_rumah']) . ')'; ?></td>
                             <?php for ($i = 1; $i <= 12; $i++):
-                                $is_lunas = isset($pembayaran_data[$warga['id_warga']][$i]);
+                                $is_lunas = in_array($i, $bulan_lunas_array);
                                 if ($is_lunas) {
                                     echo '<td><span class="text-success" title="Lunas">✅</span></td>';
                                 } else {
