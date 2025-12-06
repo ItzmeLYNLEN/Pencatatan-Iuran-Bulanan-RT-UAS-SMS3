@@ -1,27 +1,24 @@
 <?php
-
+ob_start();
 include 'templates/header.php';
-
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     $current_password = $_POST['current_password'];
     $new_password = $_POST['new_password'];
     $confirm_password = $_POST['confirm_password'];
-    $id_admin = $_SESSION['user_id'];
+    $id_pengguna = $_SESSION['user_id'];
 
-    $stmt = $conn->prepare("SELECT password FROM warga WHERE id_warga = ? AND role = 'admin'");
-    $stmt->bind_param("i", $id_admin);
+    $stmt = $conn->prepare("SELECT password FROM pengguna WHERE id_pengguna = ?");
+    $stmt->bind_param("i", $id_pengguna);
     $stmt->execute();
     $result = $stmt->get_result();
     $user = $result->fetch_assoc();
 
- 
     if ($user && $current_password === $user['password']) {
         if ($new_password === $confirm_password) {
             if (strlen($new_password) >= 6) {
-              
-                $update_stmt = $conn->prepare("UPDATE warga SET password = ? WHERE id_warga = ?");
-                $update_stmt->bind_param("si", $new_password, $id_admin);
+                $update_stmt = $conn->prepare("UPDATE pengguna SET password = ? WHERE id_pengguna = ?");
+                $update_stmt->bind_param("si", $new_password, $id_pengguna);
 
                 if ($update_stmt->execute()) {
                     $_SESSION['flash_message'] = ['type' => 'success', 'title' => 'Berhasil!', 'message' => 'Password Anda telah berhasil diperbarui.'];
@@ -141,7 +138,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     </div>
 </div>
 
-<?php include 'templates/footer.php'; ?>
+<?php 
+include 'templates/footer.php'; 
+ob_end_flush(); 
+?>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

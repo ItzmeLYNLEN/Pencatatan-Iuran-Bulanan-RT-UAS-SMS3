@@ -22,7 +22,7 @@ foreach ($list_tagihan as $item) {
 $bulan_nama = date('F', mktime(0, 0, 0, $bulan, 10));
 $order_id = "INV-" . $tahun . str_pad($bulan, 2, '0', STR_PAD_LEFT) . "-" . $id_warga;
 $dummy_va_number = "78108" . substr(str_shuffle("0123456789"), 0, 10);
-$dummy_qris_image_url = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PEMBAYARAN-" . $order_id;
+$dummy_qris_image_url = "assets/qr.png";
 $expiration_time = time() + (15 * 60);
 ?>
 <style>
