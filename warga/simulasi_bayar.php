@@ -1,5 +1,4 @@
 <?php
-
 include 'templates/header.php';
 
 if (!isset($_GET['bulan']) || !isset($_GET['tahun'])) {
@@ -8,9 +7,18 @@ if (!isset($_GET['bulan']) || !isset($_GET['tahun'])) {
 
 $bulan = (int)$_GET['bulan'];
 $tahun = (int)$_GET['tahun'];
-$id_warga = $_SESSION['user_id'];
+$id_warga = $_SESSION['id_warga'];
 $nama_lengkap = $_SESSION['nama_lengkap'];
-$iuran_per_bulan = 50000;
+
+$list_tagihan = [
+    ['nama' => 'Iuran Warga (Keamanan & Sampah)', 'jumlah' => 50000]
+];
+
+$iuran_per_bulan = 0;
+foreach ($list_tagihan as $item) {
+    $iuran_per_bulan += $item['jumlah'];
+}
+
 $bulan_nama = date('F', mktime(0, 0, 0, $bulan, 10));
 $order_id = "INV-" . $tahun . str_pad($bulan, 2, '0', STR_PAD_LEFT) . "-" . $id_warga;
 $dummy_va_number = "78108" . substr(str_shuffle("0123456789"), 0, 10);
@@ -31,11 +39,22 @@ $expiration_time = time() + (15 * 60);
                 <div class="row">
                     <div class="col-lg-5 mb-4 mb-lg-0 border-end-lg">
                         <h3 class="mb-4">Ringkasan Tagihan</h3>
-                        <ul class="list-group list-group-flush">
+                        <ul class="list-group list-group-flush mb-3">
                             <li class="list-group-item d-flex justify-content-between px-0"><span>ID Pesanan</span><strong><?php echo $order_id; ?></strong></li>
                             <li class="list-group-item d-flex justify-content-between px-0"><span>Atas Nama</span><strong><?php echo htmlspecialchars($nama_lengkap); ?></strong></li>
                             <li class="list-group-item d-flex justify-content-between px-0"><span>Periode</span><strong><?php echo $bulan_nama . ' ' . $tahun; ?></strong></li>
                         </ul>
+
+                        <h6 class="text-muted mb-2">RINCIAN ITEM:</h6>
+                        <ul class="list-group list-group-flush small mb-3">
+                            <?php foreach ($list_tagihan as $item): ?>
+                            <li class="list-group-item d-flex justify-content-between px-0 bg-transparent py-1">
+                                <span><?php echo htmlspecialchars($item['nama']); ?></span>
+                                <span>Rp <?php echo number_format($item['jumlah'], 0, ',', '.'); ?></span>
+                            </li>
+                            <?php endforeach; ?>
+                        </ul>
+
                         <div class="bg-light p-3 rounded-3 text-center mt-3">
                             <h6 class="text-muted mb-1">TOTAL PEMBAYARAN</h6>
                             <h2 class="display-6 fw-bold text-primary">Rp <?php echo number_format($iuran_per_bulan, 0, ',', '.'); ?></h2>

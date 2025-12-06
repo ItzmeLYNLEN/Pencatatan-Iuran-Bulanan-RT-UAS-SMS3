@@ -2,17 +2,20 @@
 
 include 'templates/header.php';
 
-$id_warga = $_SESSION['user_id'];
+$id_warga = $_SESSION['id_warga'];
 $tahun_sekarang = date('Y');
 $bulan_sekarang = (int)date('m');
 
-$stmt = $conn->prepare("SELECT bulan FROM pembayaran WHERE id_warga = ? AND tahun = ?");
-$stmt->bind_param("is", $id_warga, $tahun_sekarang);
+$stmt = $conn->prepare("SELECT periode_tagihan FROM transaksi WHERE id_warga = ? AND periode_tagihan LIKE ?");
+$param_tahun = $tahun_sekarang . '-%';
+$stmt->bind_param("is", $id_warga, $param_tahun);
 $stmt->execute();
 $result = $stmt->get_result();
+
 $pembayaran_lunas = [];
 while ($row = $result->fetch_assoc()) {
-    $pembayaran_lunas[] = $row['bulan'];
+    $parts = explode('-', $row['periode_tagihan']);
+    $pembayaran_lunas[] = (int)$parts[1];
 }
 
 $bulan_nama = [1=>'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -29,8 +32,8 @@ $progress_percentage = round(($jumlah_lunas / 12) * 100);
         border: 1px solid #e9ecef;
     }
     .progress-meter { width: 180px; height: 180px; position: relative; }
-    .progress-meter .progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2.5rem; font-weight: 600; color: #343a40; }
-    .progress-meter .progress-subtext { font-size: 0.9rem; font-weight: 400; color: #6c757d; }
+    .progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2.5rem; font-weight: 600; color: #343a40; }
+    .progress-subtext { font-size: 0.9rem; font-weight: 400; color: #6c757d; }
     
     .month-grid { 
         display: grid; 
@@ -56,7 +59,7 @@ $progress_percentage = round(($jumlah_lunas / 12) * 100);
     .month-card.lunas .month-name { color: #0a3622; }
 
     .month-card.tunggakan {
-        background: #f8d7da;
+        background: #f8d7da; 
         border-color: #f5c6cb;
         color: #721c24;
     }
@@ -95,7 +98,6 @@ $progress_percentage = round(($jumlah_lunas / 12) * 100);
     .month-card .status-icon { font-size: 2rem; margin: 10px 0; }
     .month-card .status-text { font-size: 0.8rem; font-weight: 500; text-transform: uppercase; }
 
-    
     @media (max-width: 768px) {
         .month-grid {
             grid-template-columns: repeat(2, 1fr);
@@ -132,12 +134,15 @@ $progress_percentage = round(($jumlah_lunas / 12) * 100);
                     $card_class = '';
                     $icon_class = '';
                     $status_text = '';
+                    $link_href = 'javascript:void(0)';
 
                     if ($is_lunas) {
                         $card_class = 'lunas';
                         $icon_class = 'fas fa-check-circle';
                         $status_text = 'LUNAS';
                     } else {
+                        $link_href = 'simulasi_bayar.php?bulan='.$bulan.'&tahun='.$tahun_sekarang;
+                        
                         if ($bulan < $bulan_sekarang) {
                             $card_class = 'tunggakan';
                             $icon_class = 'fas fa-exclamation-triangle';
@@ -153,8 +158,7 @@ $progress_percentage = round(($jumlah_lunas / 12) * 100);
                         }
                     }
                 ?>
-                    <a href="<?php echo $is_lunas ? 'javascript:void(0)' : 'simulasi_bayar.php?bulan='.$bulan.'&tahun='.$tahun_sekarang; ?>" 
-                       class="text-decoration-none">
+                    <a href="<?php echo $link_href; ?>" class="text-decoration-none">
                         <div class="month-card <?php echo $card_class; ?>">
                             <div class="month-name"><?php echo $bulan_nama[$bulan]; ?></div>
                             <div class="status-icon"><i class="<?php echo $icon_class; ?>"></i></div>

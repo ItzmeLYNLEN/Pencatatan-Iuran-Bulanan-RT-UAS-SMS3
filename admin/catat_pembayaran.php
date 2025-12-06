@@ -1,35 +1,70 @@
 <?php
 ob_start();
-
 include 'templates/header.php';
 
+
+$list_standar = [
+    ['nama' => 'Iuran Warga (Keamanan & Sampah)', 'harga' => 50000]
+];
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'bayar_iuran') {
-    $warga_id = $_POST['warga_id'];
-    $bulan_iuran = $_POST['bulan_iuran'];
-    $tahun_iuran = $_POST['tahun_iuran'];
-    $jumlah = 50000;
-    $tanggal_pembayaran = date('Y-m-d');
-    $stmt = $conn->prepare("INSERT INTO pembayaran (id_warga, bulan, tahun, jumlah, tanggal_bayar) VALUES (?, ?, ?, ?, ?)");
-    $stmt->bind_param("iiids", $warga_id, $bulan_iuran, $tahun_iuran, $jumlah, $tanggal_pembayaran);
+    $id_warga = $_POST['warga_id'];
+    $bulan = $_POST['bulan_iuran'];
+    $tahun = $_POST['tahun_iuran'];
+    $id_admin = $_SESSION['id_admin'] ?? NULL; 
     
-    if ($stmt->execute()) {
-        $_SESSION['flash_message'] = ['type' => 'success', 'message' => 'Pembayaran berhasil dicatat!'];
-    } else {
-        $errorMessage = ($conn->errno == 1062) ? 'Gagal: Warga ini sudah tercatat lunas.' : 'Gagal: ' . $stmt->error;
+    $items = $_POST['nama_item']; 
+    $biaya = $_POST['jumlah_biaya'];
+    
+    $total_tagihan = 0;
+    foreach ($biaya as $b) {
+        $total_tagihan += (int)$b;
+    }
+
+    $periode = $tahun . '-' . str_pad($bulan, 2, '0', STR_PAD_LEFT);
+    $kode = 'INV-' . date('YmdHis') . '-' . $id_warga;
+
+    $conn->begin_transaction();
+    try {
+        $stmt = $conn->prepare("INSERT INTO transaksi (kode_transaksi, id_warga, id_admin, periode_tagihan, total_tagihan, metode_pembayaran, tanggal_bayar) VALUES (?, ?, ?, ?, ?, 'manual', NOW())");
+        $stmt->bind_param("siisd", $kode, $id_warga, $id_admin, $periode, $total_tagihan);
+        $stmt->execute();
+        $id_transaksi = $conn->insert_id;
+
+        $stmt_detail = $conn->prepare("INSERT INTO detail_transaksi (id_transaksi, nama_item, jumlah_biaya) VALUES (?, ?, ?)");
+        
+        for ($i = 0; $i < count($items); $i++) {
+            $nama = $items[$i];
+            $jumlah = (int)$biaya[$i];
+            
+            if (!empty($nama) && $jumlah > 0) {
+                $stmt_detail->bind_param("isd", $id_transaksi, $nama, $jumlah);
+                $stmt_detail->execute();
+            }
+        }
+
+        $conn->commit();
+        $_SESSION['flash_message'] = ['type' => 'success', 'message' => 'Pembayaran berhasil dicatat! Total: Rp ' . number_format($total_tagihan)];
+    } catch (Exception $e) {
+        $conn->rollback();
+        $errorMessage = ($conn->errno == 1062) ? 'Gagal: Warga ini sudah tercatat lunas untuk periode tersebut.' : 'Gagal: ' . $stmt->error;
         $_SESSION['flash_message'] = ['type' => 'error', 'message' => $errorMessage];
     }
-    header("Location: catat_pembayaran.php?bulan=$bulan_iuran&tahun=$tahun_iuran");
+    
+    session_write_close();
+    header("Location: catat_pembayaran.php?bulan=$bulan&tahun=$tahun");
     exit();
 }
 
 $filter_bulan = isset($_GET['bulan']) ? $_GET['bulan'] : date('m');
 $filter_tahun = isset($_GET['tahun']) ? $_GET['tahun'] : date('Y');
+$periode_filter = $filter_tahun . '-' . str_pad($filter_bulan, 2, '0', STR_PAD_LEFT);
 
 $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
 $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
 $offset = ($page - 1) * $limit;
 
-$total_warga_result = $conn->query("SELECT COUNT(id_warga) as total FROM warga WHERE role='warga'");
+$total_warga_result = $conn->query("SELECT COUNT(id_warga) as total FROM profil_warga");
 $total_warga = $total_warga_result->fetch_assoc()['total'];
 $total_pages = ($limit == -1) ? 1 : ceil($total_warga / $limit);
 
@@ -38,15 +73,12 @@ $sql_join = "
         w.id_warga, 
         w.nama_lengkap, 
         w.no_rumah,
-        p.id_pembayaran
+        t.id_transaksi
     FROM 
-        warga w
+        profil_warga w
     LEFT JOIN 
-        pembayaran p ON w.id_warga = p.id_warga 
-                     AND p.bulan = ?
-                     AND p.tahun = ?
-    WHERE 
-        w.role = 'warga'
+        transaksi t ON w.id_warga = t.id_warga 
+                     AND t.periode_tagihan = ?
     ORDER BY 
         w.no_rumah ASC
 ";
@@ -54,10 +86,10 @@ $sql_join = "
 if ($limit != -1) {
     $sql_join .= " LIMIT ? OFFSET ?";
     $stmt_warga = $conn->prepare($sql_join);
-    $stmt_warga->bind_param("isii", $filter_bulan, $filter_tahun, $limit, $offset);
+    $stmt_warga->bind_param("sii", $periode_filter, $limit, $offset);
 } else {
     $stmt_warga = $conn->prepare($sql_join);
-    $stmt_warga->bind_param("is", $filter_bulan, $filter_tahun);
+    $stmt_warga->bind_param("s", $periode_filter);
 }
 
 $stmt_warga->execute();
@@ -70,16 +102,30 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
 <h3 class="mb-4">Catat Pembayaran Iuran</h3>
 
 <div class="card mb-4">
-    <div class="card-header">Pilih Periode</div>
+    <div class="card-header">Pilih Periode Tagihan</div>
     <div class="card-body">
         <form method="GET" action="" class="row align-items-end">
-             <div class="col-md-4"><label class="form-label">Bulan</label><select name="bulan" class="form-select">
-                <?php for ($i=1; $i<=12; $i++): ?><option value="<?php echo $i; ?>" <?php if ($i==$filter_bulan) echo 'selected'; ?>><?php echo date('F', mktime(0,0,0,$i,10)); ?></option><?php endfor; ?>
-            </select></div>
-             <div class="col-md-3"><label class="form-label">Tahun</label><select name="tahun" class="form-select">
-                <?php for ($i=date('Y'); $i>=date('Y')-5; $i--): ?><option value="<?php echo $i; ?>" <?php if ($i==$filter_tahun) echo 'selected'; ?>><?php echo $i; ?></option><?php endfor; ?>
-            </select></div>
-             <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 mt-3 mt-md-0">Tampilkan</button></div>
+             <div class="col-md-4">
+                 <label class="form-label">Bulan</label>
+                 <select name="bulan" class="form-select">
+                    <?php for ($i=1; $i<=12; $i++): ?>
+                        <option value="<?php echo $i; ?>" <?php if ($i==$filter_bulan) echo 'selected'; ?>>
+                            <?php echo date('F', mktime(0,0,0,$i,10)); ?>
+                        </option>
+                    <?php endfor; ?>
+                </select>
+            </div>
+             <div class="col-md-3">
+                 <label class="form-label">Tahun</label>
+                 <select name="tahun" class="form-select">
+                    <?php for ($i=date('Y'); $i>=date('Y')-5; $i--): ?>
+                        <option value="<?php echo $i; ?>" <?php if ($i==$filter_tahun) echo 'selected'; ?>><?php echo $i; ?></option>
+                    <?php endfor; ?>
+                </select>
+            </div>
+             <div class="col-md-2">
+                 <button type="submit" class="btn btn-primary w-100 mt-3 mt-md-0">Tampilkan</button>
+            </div>
         </form>
     </div>
 </div>
@@ -117,9 +163,7 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
                 <tbody id="paymentTableBody">
                     <?php if ($result_warga->num_rows > 0): $no = $offset + 1; ?>
                         <?php while($warga = $result_warga->fetch_assoc()): ?>
-                        <?php
-                            $is_lunas = ($warga['id_pembayaran'] !== null);
-                        ?>
+                        <?php $is_lunas = ($warga['id_transaksi'] !== null); ?>
                         <tr>
                             <td><?php echo $no++; ?></td>
                             <td><?php echo htmlspecialchars($warga['nama_lengkap']); ?></td>
@@ -133,13 +177,10 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
                             </td>
                             <td>
                                 <?php if(!$is_lunas): ?>
-                                    <form method="POST" action="?bulan=<?php echo $filter_bulan; ?>&tahun=<?php echo $filter_tahun; ?>&limit=<?php echo $limit; ?>&page=<?php echo $page; ?>">
-                                        <input type="hidden" name="warga_id" value="<?php echo $warga['id_warga']; ?>">
-                                        <input type="hidden" name="bulan_iuran" value="<?php echo $filter_bulan; ?>">
-                                        <input type="hidden" name="tahun_iuran" value="<?php echo $filter_tahun; ?>">
-                                        <input type="hidden" name="action" value="bayar_iuran">
-                                        <button type="button" class="btn btn-sm btn-primary btn-bayar" data-nama-warga="<?php echo htmlspecialchars($warga['nama_lengkap']); ?>">Bayar</button>
-                                    </form>
+                                    <button type="button" class="btn btn-sm btn-primary btn-bayar" 
+                                        data-bs-toggle="modal" data-bs-target="#modalBayar"
+                                        data-id="<?php echo $warga['id_warga']; ?>"
+                                        data-nama="<?php echo htmlspecialchars($warga['nama_lengkap']); ?>">Bayar</button>
                                 <?php else: echo "-"; endif; ?>
                             </td>
                         </tr>
@@ -163,11 +204,7 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
                         <li class="page-item <?php echo ($page <= 1) ? 'disabled' : ''; ?>">
                             <a class="page-link" href="?bulan=<?php echo $filter_bulan; ?>&tahun=<?php echo $filter_tahun; ?>&limit=<?php echo $limit; ?>&page=<?php echo $page - 1; ?>">Sebelumnya</a>
                         </li>
-                        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                        <li class="page-item <?php echo ($page == $i) ? 'active' : ''; ?>">
-                            <a class="page-link" href="?bulan=<?php echo $filter_bulan; ?>&tahun=<?php echo $filter_tahun; ?>&limit=<?php echo $limit; ?>&page=<?php echo $i; ?>"><?php echo $i; ?></a>
-                        </li>
-                        <?php endfor; ?>
+                        <li class="page-item disabled"><a class="page-link"><?php echo $page; ?></a></li>
                         <li class="page-item <?php echo ($page >= $total_pages) ? 'disabled' : ''; ?>">
                             <a class="page-link" href="?bulan=<?php echo $filter_bulan; ?>&tahun=<?php echo $filter_tahun; ?>&limit=<?php echo $limit; ?>&page=<?php echo $page + 1; ?>">Selanjutnya</a>
                         </li>
@@ -178,39 +215,68 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
     </div>
 </div>
 
+<div class="modal fade" id="modalBayar" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Rincian Pembayaran</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="bayar_iuran">
+                    <input type="hidden" name="warga_id" id="modal_warga_id">
+                    <input type="hidden" name="bulan_iuran" value="<?php echo $filter_bulan; ?>">
+                    <input type="hidden" name="tahun_iuran" value="<?php echo $filter_tahun; ?>">
+
+                    <div class="mb-3">
+                        <label class="fw-bold">Nama Warga:</label>
+                        <span id="modal_nama_warga"></span>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="fw-bold">Item Tagihan</label>
+                    </div>
+                    
+                    <div id="container-items">
+                        <?php foreach ($list_standar as $item): ?>
+                            <div class="input-group mb-2">
+                                <input type="text" readonly class="form-control" name="nama_item[]" value="<?php echo htmlspecialchars($item['nama']); ?>">
+                                <span class="input-group-text">Rp</span>
+                                <input type="number" readonly class="form-control" name="jumlah_biaya[]" value="<?php echo (int)$item['harga']; ?>">
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan Transaksi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <?php include 'templates/footer.php'; ?>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const payButtons = document.querySelectorAll('.btn-bayar');
-    payButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault(); 
-            const form = this.closest('form');
-            const namaWarga = this.getAttribute('data-nama-warga');
-            Swal.fire({
-                title: 'Konfirmasi Pembayaran',
-                text: `Anda yakin ingin mencatat pembayaran untuk ${namaWarga}?`, 
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Ya, Catat!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    form.submit();
-                }
-            });
-        });
+    
+    const modalBayar = document.getElementById('modalBayar');
+    modalBayar.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        const id = button.getAttribute('data-id');
+        const nama = button.getAttribute('data-nama');
+        
+        document.getElementById('modal_warga_id').value = id;
+        document.getElementById('modal_nama_warga').textContent = nama;
     });
     
     <?php if (isset($_SESSION['flash_message'])): ?>
-        const flashMessage = <?php echo json_encode($_SESSION['flash_message']); ?>;
         Swal.fire({
-            title: (flashMessage.type === 'success') ? 'Berhasil!' : 'Oops...',
-            text: flashMessage.message,
-            icon: flashMessage.type,
+            title: "<?php echo $_SESSION['flash_message']['type'] == 'success' ? 'Berhasil!' : 'Oops...'; ?>",
+            text: "<?php echo $_SESSION['flash_message']['message']; ?>",
+            icon: "<?php echo $_SESSION['flash_message']['type']; ?>",
             timer: 3000,
             showConfirmButton: false
         });

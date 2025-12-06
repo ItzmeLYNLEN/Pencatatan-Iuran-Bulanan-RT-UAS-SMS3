@@ -1,48 +1,120 @@
 <?php
 ob_start();
-
 include 'templates/header.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
+    
     if ($_POST['action'] == 'tambah_warga') {
         $nama = $_POST['nama_lengkap'];
         $no_rumah = $_POST['no_rumah'];
+        $no_hp = $_POST['no_telepon']; 
         $username = $_POST['username'];
         $password = $_POST['password'];
-        $role = 'warga';
-        $stmt = $conn->prepare("INSERT INTO warga (nama_lengkap, no_rumah, username, password, role) VALUES (?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssss", $nama, $no_rumah, $username, $password, $role);
-        if ($stmt->execute()) {
-            $_SESSION['flash_message'] = ['type' => 'success', 'message' => 'Warga baru berhasil ditambahkan.'];
-        } else {
-            $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal: ' . $stmt->error];
+
+        if (empty($username) || empty($password)) {
+            $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal: Username dan Password wajib diisi!'];
+            header("Location: kelola_warga.php");
+            exit();
         }
-    } elseif ($_POST['action'] == 'edit_warga') {
+
+        $conn->begin_transaction();
+        try {
+            $stmt_user = $conn->prepare("INSERT INTO pengguna (username, password, role) VALUES (?, ?, 'warga')");
+            $stmt_user->bind_param("ss", $username, $password);
+            $stmt_user->execute();
+            $id_pengguna = $conn->insert_id;
+
+            $stmt_profil = $conn->prepare("INSERT INTO profil_warga (id_pengguna, nama_lengkap, no_rumah, no_telepon) VALUES (?, ?, ?, ?)");
+            $stmt_profil->bind_param("isss", $id_pengguna, $nama, $no_rumah, $no_hp);
+            $stmt_profil->execute();
+
+            $conn->commit();
+            $_SESSION['flash_message'] = ['type' => 'success', 'message' => 'Warga dan akun berhasil ditambahkan.'];
+        } catch (Exception $e) {
+            $conn->rollback();
+            if ($conn->errno == 1062) {
+                $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal: Username atau Data sudah terdaftar.'];
+            } else {
+                $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal: ' . $e->getMessage()];
+            }
+        }
+    } 
+    
+    elseif ($_POST['action'] == 'edit_warga') {
         $id_warga = $_POST['id_warga'];
         $nama = $_POST['nama_lengkap'];
         $no_rumah = $_POST['no_rumah'];
-        $username = $_POST['username'];
-        if (!empty($_POST['password'])) {
-            $password = $_POST['password'];
-            $stmt = $conn->prepare("UPDATE warga SET nama_lengkap = ?, no_rumah = ?, username = ?, password = ? WHERE id_warga = ?");
-            $stmt->bind_param("ssssi", $nama, $no_rumah, $username, $password, $id_warga);
-        } else {
-            $stmt = $conn->prepare("UPDATE warga SET nama_lengkap = ?, no_rumah = ?, username = ? WHERE id_warga = ?");
-            $stmt->bind_param("sssi", $nama, $no_rumah, $username, $id_warga);
-        }
-        if ($stmt->execute()) {
+        $no_hp = $_POST['no_telepon'];
+        
+        $id_pengguna = !empty($_POST['id_pengguna']) ? $_POST['id_pengguna'] : NULL;
+        
+        $username_input = $_POST['username'];
+        $password_input = $_POST['password'];
+
+        $conn->begin_transaction();
+        try {
+            $stmt = $conn->prepare("UPDATE profil_warga SET nama_lengkap = ?, no_rumah = ?, no_telepon = ? WHERE id_warga = ?");
+            $stmt->bind_param("sssi", $nama, $no_rumah, $no_hp, $id_warga);
+            $stmt->execute();
+
+            if (empty($id_pengguna) && !empty($username_input) && !empty($password_input)) {
+                $stmt_new = $conn->prepare("INSERT INTO pengguna (username, password, role) VALUES (?, ?, 'warga')");
+                $stmt_new->bind_param("ss", $username_input, $password_input);
+                $stmt_new->execute();
+                $new_id_pengguna = $conn->insert_id;
+
+                $stmt_link = $conn->prepare("UPDATE profil_warga SET id_pengguna = ? WHERE id_warga = ?");
+                $stmt_link->bind_param("ii", $new_id_pengguna, $id_warga);
+                $stmt_link->execute();
+            }
+            elseif (!empty($id_pengguna)) {
+                if (!empty($username_input)) {
+                    $stmt_un = $conn->prepare("UPDATE pengguna SET username = ? WHERE id_pengguna = ?");
+                    $stmt_un->bind_param("si", $username_input, $id_pengguna);
+                    $stmt_un->execute();
+                }
+                if (!empty($password_input)) {
+                    $stmt_pw = $conn->prepare("UPDATE pengguna SET password = ? WHERE id_pengguna = ?");
+                    $stmt_pw->bind_param("si", $password_input, $id_pengguna);
+                    $stmt_pw->execute();
+                }
+            }
+
+            $conn->commit();
             $_SESSION['flash_message'] = ['type' => 'info', 'message' => 'Data warga berhasil diperbarui.'];
-        } else {
-            $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal: ' . $stmt->error];
+
+        } catch (Exception $e) {
+            $conn->rollback();
+            if ($conn->errno == 1062) {
+                $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal: Username sudah digunakan user lain.'];
+            } else {
+                $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal: ' . $e->getMessage()];
+            }
         }
-    } elseif ($_POST['action'] == 'hapus_warga') {
+    } 
+    
+    elseif ($_POST['action'] == 'hapus_warga') {
         $id_warga = $_POST['id_warga'];
-        $stmt = $conn->prepare("DELETE FROM warga WHERE id_warga = ?");
-        $stmt->bind_param("i", $id_warga);
-        if ($stmt->execute()) {
-            $_SESSION['flash_message'] = ['type' => 'warning', 'message' => 'Data warga berhasil dihapus.'];
-        } else {
-            $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal: ' . $stmt->error];
+        
+        $get_user = $conn->query("SELECT id_pengguna FROM profil_warga WHERE id_warga = $id_warga");
+        $row = $get_user->fetch_assoc();
+        $id_pengguna = $row['id_pengguna'];
+
+        $conn->begin_transaction();
+        try {
+            $stmt = $conn->prepare("DELETE FROM profil_warga WHERE id_warga = ?");
+            $stmt->bind_param("i", $id_warga);
+            $stmt->execute();
+
+            if ($id_pengguna) {
+                $conn->query("DELETE FROM pengguna WHERE id_pengguna = $id_pengguna");
+            }
+
+            $conn->commit();
+            $_SESSION['flash_message'] = ['type' => 'warning', 'message' => 'Data warga dihapus.'];
+        } catch (Exception $e) {
+            $conn->rollback();
+            $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal hapus: ' . $e->getMessage()];
         }
     }
     header("Location: kelola_warga.php");
@@ -54,16 +126,17 @@ $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
 $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
 $offset = ($page - 1) * $limit;
 
-$where_clause = "WHERE role='warga'";
+$where_clause = "";
 if (!empty($search)) {
-    $where_clause .= " AND (nama_lengkap LIKE '%$search%' OR no_rumah LIKE '%$search%' OR username LIKE '%$search%')";
+    $where_clause = "WHERE w.nama_lengkap LIKE '%$search%' OR w.no_rumah LIKE '%$search%' OR p.username LIKE '%$search%'";
 }
 
-$total_warga_result = $conn->query("SELECT COUNT(id_warga) as total FROM warga $where_clause");
+$count_query = "SELECT COUNT(w.id_warga) as total FROM profil_warga w LEFT JOIN pengguna p ON w.id_pengguna = p.id_pengguna $where_clause";
+$total_warga_result = $conn->query($count_query);
 $total_warga = $total_warga_result->fetch_assoc()['total'];
 $total_pages = ($limit == -1) ? 1 : ceil($total_warga / $limit);
 
-$sql_warga = "SELECT id_warga, nama_lengkap, no_rumah, username FROM warga $where_clause ORDER BY no_rumah ASC";
+$sql_warga = "SELECT w.*, p.username FROM profil_warga w LEFT JOIN pengguna p ON w.id_pengguna = p.id_pengguna $where_clause ORDER BY w.no_rumah ASC";
 if ($limit != -1) {
     $sql_warga .= " LIMIT $limit OFFSET $offset";
 }
@@ -81,9 +154,22 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
         <form method="POST" action="">
             <input type="hidden" name="action" value="tambah_warga">
             <div class="row">
-                <div class="col-md-4 mb-3"><label class="form-label">Nama Lengkap</label><input type="text" class="form-control" name="nama_lengkap" required></div>
-                <div class="col-md-2 mb-3"><label class="form-label">No. Rumah</label><input type="text" class="form-control" name="no_rumah" required></div>
-                <div class="col-md-3 mb-3"><label class="form-label">Username</label><input type="text" class="form-control" name="username" required></div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Nama Lengkap</label>
+                    <input type="text" class="form-control" name="nama_lengkap" required>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label class="form-label">No. Rumah</label>
+                    <input type="text" class="form-control" name="no_rumah" required>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label class="form-label">No. HP</label>
+                    <input type="text" class="form-control" name="no_telepon" required>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-control" name="username" required>
+                </div>
                 <div class="col-md-3 mb-3">
                     <label class="form-label">Password</label>
                     <div class="input-group">
@@ -92,7 +178,7 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
                     </div>
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary">Tambah Warga</button>
+            <button type="submit" class="btn btn-primary">Simpan</button>
         </form>
     </div>
 </div>
@@ -128,13 +214,7 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
         <div class="table-responsive">
             <table class="table table-bordered table-hover">
                 <thead class="table-dark">
-                    <tr>
-                        <th>No</th>
-                        <th>Nama Lengkap</th>
-                        <th>No. Rumah</th>
-                        <th>Username</th>
-                        <th>Aksi</th>
-                    </tr>
+                    <tr><th>No</th><th>Nama</th><th>Rumah</th><th>HP</th><th>Username</th><th>Aksi</th></tr>
                 </thead>
                 <tbody>
                     <?php if ($result->num_rows > 0) : $no = $offset + 1; ?>
@@ -143,18 +223,33 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
                                 <td><?php echo $no++; ?></td>
                                 <td><?php echo htmlspecialchars($row['nama_lengkap']); ?></td>
                                 <td><?php echo htmlspecialchars($row['no_rumah']); ?></td>
-                                <td><?php echo htmlspecialchars($row['username']); ?></td>
+                                <td><?php echo htmlspecialchars($row['no_telepon']); ?></td>
+                                <td><?php echo htmlspecialchars($row['username'] ?? '-'); ?></td>
                                 <td>
-                                    <button type="button" class="btn btn-sm btn-info lihatBtn" data-bs-toggle="modal" data-bs-target="#lihatWargaModal" data-nama="<?php echo htmlspecialchars($row['nama_lengkap']); ?>" data-rumah="<?php echo htmlspecialchars($row['no_rumah']); ?>" data-user="<?php echo htmlspecialchars($row['username']); ?>">Lihat</button>
-                                    <button type="button" class="btn btn-sm btn-warning editBtn" data-bs-toggle="modal" data-bs-target="#editWargaModal" data-id="<?php echo $row['id_warga']; ?>" data-nama="<?php echo htmlspecialchars($row['nama_lengkap']); ?>" data-rumah="<?php echo htmlspecialchars($row['no_rumah']); ?>" data-user="<?php echo htmlspecialchars($row['username']); ?>">Edit</button>
-                                    <button type="button" class="btn btn-sm btn-danger hapusBtn" data-bs-toggle="modal" data-bs-target="#hapusWargaModal" data-id="<?php echo $row['id_warga']; ?>">Hapus</button>
+                                    <button type="button" class="btn btn-sm btn-info lihatBtn" 
+                                        data-bs-toggle="modal" data-bs-target="#lihatWargaModal" 
+                                        data-nama="<?php echo htmlspecialchars($row['nama_lengkap']); ?>" 
+                                        data-rumah="<?php echo htmlspecialchars($row['no_rumah']); ?>" 
+                                        data-hp="<?php echo htmlspecialchars($row['no_telepon']); ?>" 
+                                        data-user="<?php echo htmlspecialchars($row['username'] ?? '-'); ?>">Lihat</button>
+                                    
+                                    <button type="button" class="btn btn-sm btn-warning editBtn" 
+                                        data-bs-toggle="modal" data-bs-target="#editWargaModal" 
+                                        data-id="<?php echo $row['id_warga']; ?>" 
+                                        data-iduser="<?php echo $row['id_pengguna']; ?>" 
+                                        data-nama="<?php echo htmlspecialchars($row['nama_lengkap']); ?>" 
+                                        data-rumah="<?php echo htmlspecialchars($row['no_rumah']); ?>" 
+                                        data-hp="<?php echo htmlspecialchars($row['no_telepon']); ?>" 
+                                        data-user="<?php echo htmlspecialchars($row['username'] ?? ''); ?>">Edit</button>
+                                    
+                                    <button type="button" class="btn btn-sm btn-danger hapusBtn" 
+                                        data-bs-toggle="modal" data-bs-target="#hapusWargaModal" 
+                                        data-id="<?php echo $row['id_warga']; ?>">Hapus</button>
                                 </td>
                             </tr>
                         <?php endwhile; ?>
                     <?php else : ?>
-                        <tr>
-                            <td colspan="5" class="text-center">Data tidak ditemukan.</td>
-                        </tr>
+                        <tr><td colspan="6" class="text-center">Data tidak ditemukan.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -189,37 +284,41 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
 <div class="modal fade" id="lihatWargaModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Detail Data Warga</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
+            <div class="modal-header"><h5 class="modal-title">Detail Data Warga</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <div class="mb-3"><label class="form-label">Nama Lengkap</label><input type="text" class="form-control" id="lihat_nama_lengkap" readonly></div>
                 <div class="mb-3"><label class="form-label">No. Rumah</label><input type="text" class="form-control" id="lihat_no_rumah" readonly></div>
+                <div class="mb-3"><label class="form-label">No. HP</label><input type="text" class="form-control" id="lihat_no_hp" readonly></div>
                 <div class="mb-3"><label class="form-label">Username</label><input type="text" class="form-control" id="lihat_username" readonly></div>
             </div>
             <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button></div>
         </div>
     </div>
 </div>
+
 <div class="modal fade" id="editWargaModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Edit Data Warga</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
+            <div class="modal-header"><h5 class="modal-title">Edit Data Warga</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <form method="POST" action="">
                 <input type="hidden" name="action" value="edit_warga">
                 <div class="modal-body">
                     <input type="hidden" name="id_warga" id="edit_id_warga">
+                    <input type="hidden" name="id_pengguna" id="edit_id_pengguna">
+                    
                     <div class="mb-3"><label class="form-label">Nama Lengkap</label><input type="text" class="form-control" name="nama_lengkap" id="edit_nama_lengkap" required></div>
                     <div class="mb-3"><label class="form-label">No. Rumah</label><input type="text" class="form-control" name="no_rumah" id="edit_no_rumah" required></div>
-                    <div class="mb-3"><label class="form-label">Username</label><input type="text" class="form-control" name="username" id="edit_username" required></div>
+                    <div class="mb-3"><label class="form-label">No. HP</label><input type="text" class="form-control" name="no_telepon" id="edit_hp"></div>
+                    
+                    <hr>
+                    <p class="text-muted small">Isi kolom di bawah ini untuk mengubah akun login.</p>
+                    <div class="mb-3"><label class="form-label">Username</label><input type="text" class="form-control" name="username" id="edit_username"></div>
                     <div class="mb-3">
-                        <label class="form-label">Password Baru</label>
+                        <label class="form-label">Password (Kosongkan jika tidak diubah)</label>
                         <div class="input-group">
                             <input type="password" class="form-control" name="password" id="editPassword">
                             <button class="btn btn-outline-secondary" type="button" id="toggleEditPassword"><i class="fas fa-eye"></i></button>
-                        </div><small class="form-text text-muted">Kosongkan jika tidak ingin mengubah password.</small>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -230,16 +329,15 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
         </div>
     </div>
 </div>
+
 <div class="modal fade" id="hapusWargaModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Konfirmasi Hapus</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST" action=""><input type="hidden" name="action" value="hapus_warga">
-                <div class="modal-body">
-                    <p>Apakah Anda yakin ingin menghapus data warga ini?</p><input type="hidden" name="id_warga" id="hapus_id_warga">
-                </div>
+            <div class="modal-header"><h5 class="modal-title">Konfirmasi Hapus</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form method="POST" action="">
+                <input type="hidden" name="action" value="hapus_warga">
+                <input type="hidden" name="id_warga" id="hapus_id_warga">
+                <div class="modal-body"><p>Yakin hapus warga ini? Data akun login dan history transaksi terkait juga mungkin akan terpengaruh.</p></div>
                 <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-danger">Ya, Hapus</button></div>
             </form>
         </div>
@@ -252,46 +350,43 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
     function setupPasswordToggle(toggleButtonId, passwordInputId) {
         const toggleButton = document.getElementById(toggleButtonId);
         const passwordInput = document.getElementById(passwordInputId);
-        const icon = toggleButton.querySelector('i');
-        toggleButton.addEventListener('click', function() {
-            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            passwordInput.setAttribute('type', type);
-            icon.classList.toggle('fa-eye');
-            icon.classList.toggle('fa-eye-slash');
-        });
+        if(toggleButton && passwordInput){
+            toggleButton.addEventListener('click', function() {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                const icon = toggleButton.querySelector('i');
+                icon.classList.toggle('fa-eye');
+                icon.classList.toggle('fa-eye-slash');
+            });
+        }
     }
     setupPasswordToggle('toggleAddPassword', 'addPassword');
     setupPasswordToggle('toggleEditPassword', 'editPassword');
 
-    const lihatWargaModal = document.getElementById('lihatWargaModal');
-    lihatWargaModal.addEventListener('show.bs.modal', function(event) {
-        const button = event.relatedTarget;
-        const nama = button.getAttribute('data-nama');
-        const rumah = button.getAttribute('data-rumah');
-        const user = button.getAttribute('data-user');
-        lihatWargaModal.querySelector('#lihat_nama_lengkap').value = nama;
-        lihatWargaModal.querySelector('#lihat_no_rumah').value = rumah;
-        lihatWargaModal.querySelector('#lihat_username').value = user;
+    const lihatModal = document.getElementById('lihatWargaModal');
+    lihatModal.addEventListener('show.bs.modal', function(event) {
+        const btn = event.relatedTarget;
+        lihatModal.querySelector('#lihat_nama_lengkap').value = btn.getAttribute('data-nama');
+        lihatModal.querySelector('#lihat_no_rumah').value = btn.getAttribute('data-rumah');
+        lihatModal.querySelector('#lihat_no_hp').value = btn.getAttribute('data-hp');
+        lihatModal.querySelector('#lihat_username').value = btn.getAttribute('data-user');
     });
 
-    const editWargaModal = document.getElementById('editWargaModal');
-    editWargaModal.addEventListener('show.bs.modal', function(event) {
-        const button = event.relatedTarget;
-        const id = button.getAttribute('data-id');
-        const nama = button.getAttribute('data-nama');
-        const rumah = button.getAttribute('data-rumah');
-        const user = button.getAttribute('data-user');
-        editWargaModal.querySelector('#edit_id_warga').value = id;
-        editWargaModal.querySelector('#edit_nama_lengkap').value = nama;
-        editWargaModal.querySelector('#edit_no_rumah').value = rumah;
-        editWargaModal.querySelector('#edit_username').value = user;
+    const editModal = document.getElementById('editWargaModal');
+    editModal.addEventListener('show.bs.modal', function(event) {
+        const btn = event.relatedTarget;
+        editModal.querySelector('#edit_id_warga').value = btn.getAttribute('data-id');
+        editModal.querySelector('#edit_id_pengguna').value = btn.getAttribute('data-iduser');
+        editModal.querySelector('#edit_nama_lengkap').value = btn.getAttribute('data-nama');
+        editModal.querySelector('#edit_no_rumah').value = btn.getAttribute('data-rumah');
+        editModal.querySelector('#edit_hp').value = btn.getAttribute('data-hp');
+        editModal.querySelector('#edit_username').value = btn.getAttribute('data-user');
+        editModal.querySelector('#editPassword').value = ''; 
     });
 
-    const hapusWargaModal = document.getElementById('hapusWargaModal');
-    hapusWargaModal.addEventListener('show.bs.modal', function(event) {
-        const button = event.relatedTarget;
-        const id = button.getAttribute('data-id');
-        hapusWargaModal.querySelector('#hapus_id_warga').value = id;
+    const hapusModal = document.getElementById('hapusWargaModal');
+    hapusModal.addEventListener('show.bs.modal', function(event) {
+        hapusModal.querySelector('#hapus_id_warga').value = event.relatedTarget.getAttribute('data-id');
     });
 
     <?php if (isset($_SESSION['flash_message'])) : ?>

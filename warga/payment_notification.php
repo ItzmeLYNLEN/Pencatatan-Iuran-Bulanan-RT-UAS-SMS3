@@ -5,47 +5,49 @@ if (session_status() === PHP_SESSION_NONE) {
 include '../config/db.php';
 date_default_timezone_set('Asia/Jakarta');
 
-if ($_SERVER['REQUEST_METHOD'] != 'POST' || !isset($_SESSION['user_id'])) {
+if ($_SERVER['REQUEST_METHOD'] != 'POST' || !isset($_SESSION['id_warga'])) {
     header("Location: index.php");
     exit;
 }
 
-
-$id_warga = (int)$_POST['id_warga'];
+$id_warga = $_SESSION['id_warga'];
 $bulan = (int)$_POST['bulan'];
 $tahun = (int)$_POST['tahun'];
-$jumlah = 50000;
+$periode = $tahun . '-' . str_pad($bulan, 2, '0', STR_PAD_LEFT);
 $status = $_POST['payment_status'];
 
-if ($id_warga != $_SESSION['user_id']) {
-    header("Location: index.php");
-    exit;
-}
-
 if ($status == 'success') {
-    $cek_stmt = $conn->prepare("SELECT id_pembayaran FROM pembayaran WHERE id_warga = ? AND bulan = ? AND tahun = ?");
-    $cek_stmt->bind_param("iii", $id_warga, $bulan, $tahun);
-    $cek_stmt->execute();
-    $result_cek = $cek_stmt->get_result();
-
-    if ($result_cek->num_rows == 0) {
-        $tanggal_bayar = date('Y-m-d');
-
-        $stmt_insert = $conn->prepare("INSERT INTO pembayaran (id_warga, bulan, tahun, jumlah, tanggal_bayar) VALUES (?, ?, ?, ?, ?)");
-        $stmt_insert->bind_param("iiids", $id_warga, $bulan, $tahun, $jumlah, $tanggal_bayar);
+    $cek = $conn->prepare("SELECT id_transaksi FROM transaksi WHERE id_warga = ? AND periode_tagihan = ?");
+    $cek->bind_param("is", $id_warga, $periode);
+    $cek->execute();
+    
+    if ($cek->get_result()->num_rows == 0) {
+        $kode = 'INV-ON-' . date('YmdHis') . '-' . $id_warga;
         
-        if ($stmt_insert->execute()) {
-            $_SESSION['flash_message'] = ['type' => 'success','title' => 'Pembayaran Berhasil!','message' => 'Terima kasih, pembayaran Anda telah kami terima.'];
-        } else {
-            $_SESSION['flash_message'] = ['type' => 'error','title' => 'Oops... Terjadi Kesalahan','message' => 'Gagal menyimpan data pembayaran ke database.'];
+        $total = 50000; 
+
+        $conn->begin_transaction();
+        try {
+            $stmt = $conn->prepare("INSERT INTO transaksi (kode_transaksi, id_warga, id_admin, periode_tagihan, total_tagihan, metode_pembayaran, tanggal_bayar) VALUES (?, ?, NULL, ?, ?, 'online', NOW())");
+            $stmt->bind_param("sisd", $kode, $id_warga, $periode, $total);
+            $stmt->execute();
+            $id_transaksi = $conn->insert_id;
+
+            $nama_item = 'Iuran Warga (Keamanan & Sampah)';
+            $stmt_d = $conn->prepare("INSERT INTO detail_transaksi (id_transaksi, nama_item, jumlah_biaya) VALUES (?, ?, ?)");
+            $stmt_d->bind_param("isd", $id_transaksi, $nama_item, $total);
+            $stmt_d->execute();
+
+            $conn->commit();
+            $_SESSION['flash_message'] = ['type' => 'success','title' => 'Berhasil','message' => 'Pembayaran Online Diterima.'];
+        } catch (Exception $e) {
+            $conn->rollback();
+            $_SESSION['flash_message'] = ['type' => 'error','title' => 'Gagal','message' => 'Error database.'];
         }
     } else {
-        $_SESSION['flash_message'] = ['type' => 'info','title' => 'Informasi','message' => 'Anda sudah membayar iuran untuk periode ini.'];
+        $_SESSION['flash_message'] = ['type' => 'info','title' => 'Info','message' => 'Tagihan sudah lunas sebelumnya.'];
     }
-} else {
-    $_SESSION['flash_message'] = ['type' => 'error','title' => 'Pembayaran Gagal','message' => 'Proses pembayaran Anda tidak berhasil diselesaikan.'];
 }
-
 header("Location: index.php");
 exit;
 ?>
