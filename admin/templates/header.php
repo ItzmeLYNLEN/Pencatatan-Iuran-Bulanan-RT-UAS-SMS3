@@ -78,6 +78,10 @@ if (isset($words[1])) {
                     <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'laporan.php') ? 'active' : ''; ?>" href="laporan.php">Laporan Iuran</a></li>
                 </ul>
                 
+                <a class="btn btn-outline-primary btn-sm me-3 my-2 my-lg-0" href="../warga/index.php">
+                    <i class="fas fa-wallet me-1"></i> Bayar Sendiri
+                </a>
+
                 <div class="nav-item dropdown">
                     <a class="nav-link" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <div class="avatar"><?php echo $initials; ?></div>

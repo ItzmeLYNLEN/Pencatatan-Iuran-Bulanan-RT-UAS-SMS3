@@ -4,8 +4,14 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../../config/db.php';
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'warga') {
+
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] != 'warga' && $_SESSION['role'] != 'admin')) {
     header("Location: ../index.php");
+    exit;
+}
+
+if (!isset($_SESSION['id_warga'])) {
+    echo "<script>alert('Akun Anda adalah Admin, tetapi data diri Anda belum terdaftar sebagai Warga. Silakan input data diri Anda sendiri di menu Kelola Warga.'); window.location='../admin/index.php';</script>";
     exit;
 }
 
@@ -36,7 +42,7 @@ if (isset($words[1])) {
     <style>
         body {
             font-family: 'Poppins', sans-serif;
-            background-color: #f8f9fa; /* Latar belakang abu-abu sangat muda */
+            background-color: #f8f9fa;
         }
         .navbar-brand {
             font-weight: 600;
@@ -86,6 +92,13 @@ if (isset($words[1])) {
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <?php if ($_SESSION['role'] == 'admin'): ?>
+                        <li class="nav-item">
+                            <a class="nav-link text-danger fw-bold" href="../admin/index.php">
+                                <i class="fas fa-user-shield me-1"></i> Kembali ke Admin
+                            </a>
+                        </li>
+                    <?php endif; ?>
                 </ul>
                 <div class="nav-item dropdown">
                     <a class="nav-link" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">

@@ -4,6 +4,7 @@ include 'templates/header.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
     
+    // --- 1. TAMBAH WARGA ---
     if ($_POST['action'] == 'tambah_warga') {
         $nama = $_POST['nama_lengkap'];
         $no_rumah = $_POST['no_rumah'];
@@ -33,18 +34,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         } catch (Exception $e) {
             $conn->rollback();
             if ($conn->errno == 1062) {
-                $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal: Username atau Data sudah terdaftar.'];
+                $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal: Username sudah terdaftar.'];
             } else {
                 $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal: ' . $e->getMessage()];
             }
         }
     } 
     
+    // --- 2. EDIT WARGA (UPDATE ROLE & DATA) ---
     elseif ($_POST['action'] == 'edit_warga') {
         $id_warga = $_POST['id_warga'];
         $nama = $_POST['nama_lengkap'];
         $no_rumah = $_POST['no_rumah'];
         $no_hp = $_POST['no_telepon'];
+        $role_input = $_POST['role']; // Input Role Baru
         
         $id_pengguna = !empty($_POST['id_pengguna']) ? $_POST['id_pengguna'] : NULL;
         
@@ -53,21 +56,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
 
         $conn->begin_transaction();
         try {
+            // A. Update Profil Warga
             $stmt = $conn->prepare("UPDATE profil_warga SET nama_lengkap = ?, no_rumah = ?, no_telepon = ? WHERE id_warga = ?");
             $stmt->bind_param("sssi", $nama, $no_rumah, $no_hp, $id_warga);
             $stmt->execute();
 
+            // B. Cek/Buat Akun Login
             if (empty($id_pengguna) && !empty($username_input) && !empty($password_input)) {
-                $stmt_new = $conn->prepare("INSERT INTO pengguna (username, password, role) VALUES (?, ?, 'warga')");
-                $stmt_new->bind_param("ss", $username_input, $password_input);
+                // Buat akun baru
+                $stmt_new = $conn->prepare("INSERT INTO pengguna (username, password, role) VALUES (?, ?, ?)");
+                $stmt_new->bind_param("sss", $username_input, $password_input, $role_input);
                 $stmt_new->execute();
                 $new_id_pengguna = $conn->insert_id;
 
                 $stmt_link = $conn->prepare("UPDATE profil_warga SET id_pengguna = ? WHERE id_warga = ?");
                 $stmt_link->bind_param("ii", $new_id_pengguna, $id_warga);
                 $stmt_link->execute();
+                
+                $id_pengguna = $new_id_pengguna; 
             }
             elseif (!empty($id_pengguna)) {
+                // Update akun lama
                 if (!empty($username_input)) {
                     $stmt_un = $conn->prepare("UPDATE pengguna SET username = ? WHERE id_pengguna = ?");
                     $stmt_un->bind_param("si", $username_input, $id_pengguna);
@@ -78,21 +87,47 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     $stmt_pw->bind_param("si", $password_input, $id_pengguna);
                     $stmt_pw->execute();
                 }
+                // Update Role di tabel pengguna
+                $stmt_role = $conn->prepare("UPDATE pengguna SET role = ? WHERE id_pengguna = ?");
+                $stmt_role->bind_param("si", $role_input, $id_pengguna);
+                $stmt_role->execute();
+            }
+
+            // C. Sinkronisasi Profil Admin (INI YANG DIPERBAIKI)
+            if (!empty($id_pengguna)) {
+                if ($role_input == 'admin') {
+                    // Jika jadi ADMIN: Tambahkan ke profil_admin jika belum ada
+                    $cek_admin = $conn->query("SELECT id_admin FROM profil_admin WHERE id_pengguna = $id_pengguna");
+                    if ($cek_admin->num_rows == 0) {
+                        $stmt_add = $conn->prepare("INSERT INTO profil_admin (id_pengguna, nama_lengkap) VALUES (?, ?)");
+                        $stmt_add->bind_param("is", $id_pengguna, $nama);
+                        $stmt_add->execute();
+                    } else {
+                        // Update nama juga biar sinkron
+                        $stmt_upd = $conn->prepare("UPDATE profil_admin SET nama_lengkap = ? WHERE id_pengguna = ?");
+                        $stmt_upd->bind_param("si", $nama, $id_pengguna);
+                        $stmt_upd->execute();
+                    }
+                } 
+                elseif ($role_input == 'warga') {
+                    // Jika jadi WARGA: HAPUS dari profil_admin (Bersih-bersih)
+                    $stmt_del = $conn->prepare("DELETE FROM profil_admin WHERE id_pengguna = ?");
+                    $stmt_del->bind_param("i", $id_pengguna);
+                    $stmt_del->execute();
+                }
             }
 
             $conn->commit();
-            $_SESSION['flash_message'] = ['type' => 'info', 'message' => 'Data warga berhasil diperbarui.'];
+            $_SESSION['flash_message'] = ['type' => 'info', 'message' => 'Data warga dan role berhasil diperbarui.'];
 
         } catch (Exception $e) {
             $conn->rollback();
-            if ($conn->errno == 1062) {
-                $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal: Username sudah digunakan user lain.'];
-            } else {
-                $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal: ' . $e->getMessage()];
-            }
+            $msg = ($conn->errno == 1062) ? 'Username sudah digunakan.' : $e->getMessage();
+            $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Gagal: ' . $msg];
         }
     } 
     
+    // --- 3. HAPUS WARGA ---
     elseif ($_POST['action'] == 'hapus_warga') {
         $id_warga = $_POST['id_warga'];
         
@@ -121,6 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
     exit();
 }
 
+// --- TAMPILAN DATA ---
 $search = isset($_GET['search']) ? $conn->real_escape_string($_GET['search']) : '';
 $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
 $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
@@ -136,7 +172,7 @@ $total_warga_result = $conn->query($count_query);
 $total_warga = $total_warga_result->fetch_assoc()['total'];
 $total_pages = ($limit == -1) ? 1 : ceil($total_warga / $limit);
 
-$sql_warga = "SELECT w.*, p.username FROM profil_warga w LEFT JOIN pengguna p ON w.id_pengguna = p.id_pengguna $where_clause ORDER BY w.no_rumah ASC";
+$sql_warga = "SELECT w.*, p.username, p.role FROM profil_warga w LEFT JOIN pengguna p ON w.id_pengguna = p.id_pengguna $where_clause ORDER BY w.no_rumah ASC";
 if ($limit != -1) {
     $sql_warga .= " LIMIT $limit OFFSET $offset";
 }
@@ -166,6 +202,7 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
                     <label class="form-label">No. HP</label>
                     <input type="text" class="form-control" name="no_telepon" required>
                 </div>
+                
                 <div class="col-md-2 mb-3">
                     <label class="form-label">Username</label>
                     <input type="text" class="form-control" name="username" required>
@@ -214,7 +251,7 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
         <div class="table-responsive">
             <table class="table table-bordered table-hover">
                 <thead class="table-dark">
-                    <tr><th>No</th><th>Nama</th><th>Rumah</th><th>HP</th><th>Username</th><th>Aksi</th></tr>
+                    <tr><th>No</th><th>Nama</th><th>Rumah</th><th>HP</th><th>Akun/Role</th><th>Aksi</th></tr>
                 </thead>
                 <tbody>
                     <?php if ($result->num_rows > 0) : $no = $offset + 1; ?>
@@ -224,7 +261,17 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
                                 <td><?php echo htmlspecialchars($row['nama_lengkap']); ?></td>
                                 <td><?php echo htmlspecialchars($row['no_rumah']); ?></td>
                                 <td><?php echo htmlspecialchars($row['no_telepon']); ?></td>
-                                <td><?php echo htmlspecialchars($row['username'] ?? '-'); ?></td>
+                                <td>
+                                    <?php 
+                                        if($row['username']) {
+                                            echo htmlspecialchars($row['username']);
+                                            if($row['role'] == 'admin') echo ' <span class="badge bg-danger">Admin</span>';
+                                            else echo ' <span class="badge bg-secondary">Warga</span>';
+                                        } else {
+                                            echo '-';
+                                        }
+                                    ?>
+                                </td>
                                 <td>
                                     <button type="button" class="btn btn-sm btn-info lihatBtn" 
                                         data-bs-toggle="modal" data-bs-target="#lihatWargaModal" 
@@ -240,7 +287,8 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
                                         data-nama="<?php echo htmlspecialchars($row['nama_lengkap']); ?>" 
                                         data-rumah="<?php echo htmlspecialchars($row['no_rumah']); ?>" 
                                         data-hp="<?php echo htmlspecialchars($row['no_telepon']); ?>" 
-                                        data-user="<?php echo htmlspecialchars($row['username'] ?? ''); ?>">Edit</button>
+                                        data-user="<?php echo htmlspecialchars($row['username'] ?? ''); ?>"
+                                        data-role="<?php echo htmlspecialchars($row['role'] ?? 'warga'); ?>">Edit</button>
                                     
                                     <button type="button" class="btn btn-sm btn-danger hapusBtn" 
                                         data-bs-toggle="modal" data-bs-target="#hapusWargaModal" 
@@ -311,8 +359,20 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
                     <div class="mb-3"><label class="form-label">No. HP</label><input type="text" class="form-control" name="no_telepon" id="edit_hp"></div>
                     
                     <hr>
-                    <p class="text-muted small">Isi kolom di bawah ini untuk mengubah akun login.</p>
-                    <div class="mb-3"><label class="form-label">Username</label><input type="text" class="form-control" name="username" id="edit_username"></div>
+                    <p class="text-muted small">Pengaturan Akun</p>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Role</label>
+                            <select name="role" id="edit_role" class="form-select">
+                                <option value="warga">Warga</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" name="username" id="edit_username">
+                        </div>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label">Password (Kosongkan jika tidak diubah)</label>
                         <div class="input-group">
@@ -381,6 +441,7 @@ $end_entry = ($limit == -1) ? $total_warga : min($offset + $limit, $total_warga)
         editModal.querySelector('#edit_no_rumah').value = btn.getAttribute('data-rumah');
         editModal.querySelector('#edit_hp').value = btn.getAttribute('data-hp');
         editModal.querySelector('#edit_username').value = btn.getAttribute('data-user');
+        editModal.querySelector('#edit_role').value = btn.getAttribute('data-role'); // Load Role
         editModal.querySelector('#editPassword').value = ''; 
     });
 
